@@ -1,0 +1,291 @@
+{% extends "base.html" %}
+{% block title %}The Agents — MoneyWrench MES{% endblock %}
+{% block head %}
+<style>
+.slide{background:var(--panel);border:1px solid var(--line);border-radius:16px;
+  padding:26px 30px;margin-bottom:20px;box-shadow:0 6px 24px #0006}
+.slide h2{margin:0 0 4px;font-size:20px}
+.slide h2 .no{color:var(--amber);font-family:var(--font-mono);font-size:13px;margin-right:10px}
+.slide p.lead{color:var(--muted);margin:4px 0 16px}
+.flow{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:center;margin:14px 0}
+.fnode{background:var(--panel-2);border:1px solid var(--line);border-radius:12px;
+  padding:12px 16px;text-align:center;min-width:150px}
+.fnode .t{font-size:22px}
+.fnode .n{font-weight:700;margin-top:2px}
+.fnode .d{font-size:11px;color:var(--muted);font-family:var(--font-mono)}
+.fnode.hot{border-color:color-mix(in srgb,var(--amber) 40%,transparent);box-shadow:0 0 16px var(--glow)}
+.farrow{color:var(--amber);font-size:22px}
+.crew{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px}
+.agent{background:var(--panel-2);border:1px solid var(--line);border-radius:14px;padding:18px}
+.agent .head{display:flex;align-items:center;gap:12px}
+.agent .avatar{font-size:34px;background:color-mix(in srgb,var(--amber) 12%,transparent);
+  border:1px solid color-mix(in srgb,var(--amber) 35%,transparent);border-radius:12px;
+  width:56px;height:56px;display:flex;align-items:center;justify-content:center}
+.agent h3{margin:0;font-size:16px}
+.agent .type{font-family:var(--font-mono);font-size:10.5px;color:var(--amber);
+  text-transform:uppercase;letter-spacing:.1em}
+.agent .modelchip{font-family:var(--font-mono);font-size:10px;border:1px solid var(--line);
+  border-radius:99px;padding:2px 8px;color:var(--cyan);margin-left:6px}
+.agent .quote{font-style:italic;color:var(--muted);font-size:12px;margin:8px 0}
+.agent ul{margin:8px 0 0;padding-left:18px;font-size:12.5px;color:var(--muted)}
+.agent ul li{margin-bottom:4px}
+.agent .formula{font-family:var(--font-mono);font-size:12px;background:var(--panel-2);
+  border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-top:10px;color:var(--cyan)}
+.agent .formula b{color:var(--amber)}
+.steps{counter-reset:s;display:grid;gap:10px;margin-top:6px}
+.step{display:flex;gap:14px;align-items:baseline;background:var(--panel-2);
+  border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.step::before{counter-increment:s;content:"0" counter(s);font-family:var(--font-mono);
+  color:var(--amber);font-weight:700}
+.kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-top:12px}
+.kv .cell{background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:12px}
+.kv .cell .k{font-family:var(--font-mono);font-size:10.5px;color:var(--muted);text-transform:uppercase}
+.kv .cell .v{font-size:13px;margin-top:4px}
+</style>
+{% endblock %}
+{% block content %}
+<h1 class="page">The Agents — a guided tour</h1>
+<p class="sub">&gt; one orchestrator, eight specialists, zero coffee breaks. here's who does what and which formula they sharpen.</p>
+
+<!-- SLIDE 1 -->
+<div class="slide">
+  <h2><span class="no">01</span>The big picture</h2>
+  <p class="lead">You ask a question in plain English. The lead agent plans, delegates to specialists,
+     and every number is fetched from the deterministic KPI engine — the AI never invents a KPI, it only interrogates them.</p>
+  <div class="flow">
+    <div class="fnode"><div class="t">🧑‍🔧</div><div class="n">You</div><div class="d">"where's my money going?"</div></div>
+    <div class="farrow">→</div>
+    <div class="fnode hot"><div class="t">🎛️</div><div class="n">Orchestrator</div><div class="d">lead agent · plans & delegates</div></div>
+    <div class="farrow">→</div>
+    <div class="fnode"><div class="t">🕵️💰📋🔧🧪📦⚡</div><div class="n">Specialist crew</div><div class="d">8 subagents in parallel</div></div>
+    <div class="farrow">→</div>
+    <div class="fnode"><div class="t">🧮</div><div class="n">KPI engine</div><div class="d">pandas · deterministic math</div></div>
+    <div class="farrow">→</div>
+    <div class="fnode"><div class="t">🗄️</div><div class="n">MES database</div><div class="d">orders · downtime · quality</div></div>
+  </div>
+  <div class="kv">
+    <div class="cell"><div class="k">Framework</div><div class="v">Claude Agent SDK — orchestrator + AgentDefinition subagents</div></div>
+    <div class="cell"><div class="k">Tools</div><div class="v">8 custom KPI tools + read-only SQL, exposed via an in-process MCP server</div></div>
+    <div class="cell"><div class="k">Configurable models</div><div class="v">Every agent's model is set in <code>config/agents.yaml</code> — swap
+      <code>sonnet</code> → <code>opus</code> (or a future model) and restart. Live config: <span id="cfg-live">loading…</span></div></div>
+    <div class="cell"><div class="k">Guarantee</div><div class="v">Agents can read everything, compute nothing by hand, and change nothing</div></div>
+  </div>
+</div>
+
+<!-- SLIDE 2 -->
+<div class="slide">
+  <h2><span class="no">02</span>Meet the crew</h2>
+  <p class="lead">Each specialist owns one slice of the plant's physics — and one term of the money equation.</p>
+  <div class="crew">
+    <div class="agent">
+      <div class="head"><div class="avatar">🎛️</div>
+        <div><h3>The Orchestrator</h3><div class="type">Lead agent · claude</div></div></div>
+      <div class="quote">"I don't do the digging. I decide where to dig."</div>
+      <ul>
+        <li>Parses your question and checks what data exists (<code>get_data_overview</code>)</li>
+        <li>Answers simple lookups itself; fans out hard questions to the specialists</li>
+        <li>Merges findings into one consultant-grade answer with dollars and recommendations</li>
+      </ul>
+      <div class="formula">Answer = Σ specialist findings, ranked by <b>$ impact</b></div>
+    </div>
+
+    <div class="agent">
+      <div class="head"><div class="avatar">📊</div>
+        <div><h3>KPI Analyst</h3><div class="type">Subagent<span class="modelchip" data-agent="kpi-analyst"></span></div></div></div>
+      <div class="quote">"A trend line never lies. People who read them badly do."</div>
+      <ul>
+        <li>Tracks OEE and its three gears across machines, products, months</li>
+        <li>Flags anomalies: the machine whose availability quietly erodes every month</li>
+        <li>Benchmarks: world-class ≈ 85%, typical ≈ 60%</li>
+      </ul>
+      <div class="formula">OEE = <b>Availability</b> × <b>Performance</b> × <b>Quality</b> &nbsp;·&nbsp; TEEP = OEE × Utilization</div>
+    </div>
+
+    <div class="agent">
+      <div class="head"><div class="avatar">🕵️</div>
+        <div><h3>Downtime Investigator</h3><div class="type">Deck role: Diagnosis Agent<span class="modelchip" data-agent="downtime-investigator"></span></div></div></div>
+      <div class="quote">"80% of your downtime hides behind 20% of your excuses."</div>
+      <ul>
+        <li>Builds the downtime Pareto by reason code, category, machine</li>
+        <li>Separates breakdowns vs changeovers vs minor stops (the Six Big Losses)</li>
+        <li>Distinguishes chronic offenders from growing failures</li>
+      </ul>
+      <div class="formula">Availability = (planned − <b>downtime</b>) / planned — this agent shrinks the red term</div>
+    </div>
+
+    <div class="agent">
+      <div class="head"><div class="avatar">💰</div>
+        <div><h3>Cost-Leakage Hunter</h3><div class="type">Subagent<span class="modelchip" data-agent="cost-leakage-hunter"></span></div></div></div>
+      <div class="quote">"Minutes are cute. Show me the dollars."</div>
+      <ul>
+        <li>Prices every loss: downtime × hourly rate, scrap × (material + machine time)</li>
+        <li>Ranks the leaks plant-wide and per machine/product/month</li>
+        <li>Estimates the annualized saving of halving each leak — your focus list</li>
+      </ul>
+      <div class="formula">Bleed = Σ (loss minutes / 60) × <b>$rate</b> + scrap × (<b>$material</b> + cycle·<b>$rate</b>)</div>
+    </div>
+
+    <div class="agent">
+      <div class="head"><div class="avatar">📋</div>
+        <div><h3>Schedule Auditor</h3><div class="type">Deck role: Planner Agent<span class="modelchip" data-agent="schedule-auditor"></span></div></div></div>
+      <div class="quote">"Your plan said Tuesday. Reality filed for an extension."</div>
+      <ul>
+        <li>Compares scheduled vs actual start and finish for every work order</li>
+        <li>Computes on-time %, order fulfilment (OTD), start delay, overrun</li>
+        <li>Traces slippage to its physical cause via the other agents' domains</li>
+      </ul>
+      <div class="formula">Adherence = on-time orders / all orders &nbsp;·&nbsp; overrun = actual − <b>scheduled</b> finish</div>
+    </div>
+
+    <div class="agent">
+      <div class="head"><div class="avatar">🔧</div>
+        <div><h3>Maintenance Strategist</h3><div class="type">Deck role: Diagnosis Agent<span class="modelchip" data-agent="maintenance-strategist"></span></div></div></div>
+      <div class="quote">"Machines whisper before they scream. I speak fluent whisper."</div>
+      <ul>
+        <li>Computes MTBF and MTTR per machine from the downtime log</li>
+        <li>Separates frequent-but-quick failures from rare-but-long ones</li>
+        <li>Prices preventive maintenance against avoided downtime cost</li>
+      </ul>
+      <div class="formula">MTBF = run hours / <b>breakdowns</b> &nbsp;·&nbsp; MTTR = Σ repair min / breakdowns</div>
+    </div>
+
+    <div class="agent">
+      <div class="head"><div class="avatar">🧪</div>
+        <div><h3>Quality Warden</h3><div class="type">Deck role: Diagnosis Agent<span class="modelchip" data-agent="quality-warden"></span></div></div></div>
+      <div class="quote">"Every scrapped part is paid for three times. I keep the receipts."</div>
+      <ul>
+        <li>Watches FPY, scrap rate, ppm and the cost of poor quality</li>
+        <li>Ties defects to machines, products and operators</li>
+        <li>Ranks quality fixes by dollar payback</li>
+      </ul>
+      <div class="formula">FPY = (units − scrap − rework) / units &nbsp;·&nbsp; COPQ = scrap × (<b>$mat</b> + t·<b>$rate</b>)</div>
+    </div>
+
+    <div class="agent">
+      <div class="head"><div class="avatar">📦</div>
+        <div><h3>Material Controller</h3><div class="type">Deck role: Material Agent<span class="modelchip" data-agent="material-controller"></span></div></div></div>
+      <div class="quote">"Your inventory is cash wearing a hi-vis vest. Some of it is asleep."</div>
+      <ul>
+        <li>Tracks inventory turns, days of cover and carrying cost per product</li>
+        <li>Flags overstock (gears napping on racks) and starvation risk</li>
+        <li>Quantifies the saving of right-sizing stock levels</li>
+      </ul>
+      <div class="formula">Turns = COGS / <b>avg inventory</b> &nbsp;·&nbsp; DOI = 365 / turns</div>
+    </div>
+
+    <div class="agent">
+      <div class="head"><div class="avatar">⚡</div>
+        <div><h3>Energy Optimizer</h3><div class="type">Deck role: Energy Agent<span class="modelchip" data-agent="energy-optimizer"></span></div></div></div>
+      <div class="quote">"Watts that don't make parts are just expensive heat."</div>
+      <ul>
+        <li>Meters kWh per good unit and energy spend per machine</li>
+        <li>Separates productive draw from idle draw during downtime</li>
+        <li>Estimates the annual saving of fixing the biggest energy hog</li>
+      </ul>
+      <div class="formula">Energy efficiency = kWh / <b>good unit</b> &nbsp;·&nbsp; spend = kWh × <b>tariff</b></div>
+    </div>
+
+    <div class="agent">
+      <div class="head"><div class="avatar">🧑‍💼</div>
+        <div><h3>Sales Engineer</h3><div class="type">Advisor pitch writer<span class="modelchip" data-agent="sales-engineer"></span></div></div></div>
+      <div class="quote">"You bring the numbers. I bring the 'and that's why you should sign'."</div>
+      <ul>
+        <li>Turns Sales Advisor selections into executive pitch copy</li>
+        <li>Grounded only in the numbers it's given — never re-derives, never invents</li>
+        <li>Ends every pitch with the 3-week Money-Bleed Audit call to action</li>
+      </ul>
+      <div class="formula">Pitch = headline $ + top levers × <b>agent story</b> + call to action</div>
+    </div>
+
+    <div class="agent">
+      <div class="head"><div class="avatar">🧑‍🏭</div>
+        <div><h3>Manufacturing SME</h3><div class="type">Chat co-pilot · web-enabled<span class="modelchip" data-agent="manufacturing-sme"></span></div></div></div>
+      <div class="quote">"Ask me why, how or when. I'll bring receipts — from your data or the web."</div>
+      <ul>
+        <li>Lives in the 🧑‍🏭 drawer on every page; multi-turn, page-aware</li>
+        <li>Numbers only from the KPI tools or cited web sources (strict grounding)</li>
+        <li>Pivots on evidence: follows your redirects, but shows the data when it disagrees</li>
+      </ul>
+      <div class="formula">Answer = KPI tools first → <b>cited web</b> second → "I'd need to verify" never a guess</div>
+    </div>
+
+    <div class="agent">
+      <div class="head"><div class="avatar">🧮</div>
+        <div><h3>The KPI Engine</h3><div class="type">Not an agent · pure math</div></div></div>
+      <div class="quote">"I have no opinions. That is my entire value proposition."</div>
+      <ul>
+        <li>Deterministic pandas pipeline over the MES schema — same input, same answer</li>
+        <li>Sums time buckets first, then takes ratios (never averages percentages)</li>
+        <li>The agents' only source of numbers, exposed as tools</li>
+      </ul>
+      <div class="formula">window = run time + downtime &nbsp;·&nbsp; ideal = cycle × units — identities enforced by tests</div>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 3 -->
+<div class="slide">
+  <h2><span class="no">03</span>Anatomy of one question</h2>
+  <p class="lead">"Where am I bleeding money?" — what actually happens in the ~30 seconds that follow.</p>
+  <div class="steps">
+    <div class="step">Orchestrator calls <code>get_data_overview</code>: 6 machines, 5 products, 12 months, ~4,000 work orders. Now it knows the battlefield.</div>
+    <div class="step">It dispatches the Cost-Leakage Hunter (rank the $), the Downtime Investigator (explain the biggest time loss), and the KPI Analyst (find the trend) — in parallel.</div>
+    <div class="step">Each specialist calls its KPI tools; the engine computes from SQLite; raw tables flow back. No number is ever made up — if the database is empty, the agents say so.</div>
+    <div class="step">The orchestrator reconciles the findings: "CNC-01's bearing failures cost $X and are growing 20%/month; PACK-01's speed loss quietly burns $Y; ASM-01 scraps $Z of valve bodies."</div>
+    <div class="step">You get one answer: headline, evidence, and the 2–3 fixes with the biggest payback. The agents return to standby. They do not unionize.</div>
+  </div>
+</div>
+
+<!-- SLIDE 3.5 — CONFIGURABLE BRAINS -->
+<div class="slide">
+  <h2><span class="no">3½</span>Configurable brains</h2>
+  <p class="lead">Every agent's model is a setting, not a hard-code — swap or upgrade whenever a better brain ships.</p>
+  <div class="kv">
+    <div class="cell"><div class="k">Where</div>
+      <div class="v"><code>config/agents.yaml</code> at the project root</div></div>
+    <div class="cell"><div class="k">What you can change</div>
+      <div class="v">Per-agent <code>model</code> (sonnet / opus / haiku / inherit), <code>enabled</code> flag,
+        orchestrator model &amp; turn budget</div></div>
+    <div class="cell"><div class="k">How to apply</div>
+      <div class="v">Edit the file, restart the server. No code changes. The chips on this page show the live config.</div></div>
+    <div class="cell"><div class="k">Why it matters</div>
+      <div class="v">Models improve monthly; your MES logic shouldn't be married to one. The deck calls this the
+        LLM Agent Framework layer — swappable by design.</div></div>
+  </div>
+</div>
+
+<!-- SLIDE 4 -->
+<div class="slide">
+  <h2><span class="no">04</span>How agents enhance the formulas</h2>
+  <p class="lead">The formulas are static physics; the agents make them actionable.</p>
+  <div class="kv">
+    <div class="cell"><div class="k">Formula alone</div>
+      <div class="v">OEE = 61.3%. Interesting. Now what?</div></div>
+    <div class="cell"><div class="k">+ KPI Analyst</div>
+      <div class="v">"OEE fell 6 points since March, entirely from Availability, entirely on CNC-01."</div></div>
+    <div class="cell"><div class="k">+ Downtime Investigator</div>
+      <div class="v">"CNC-01's loss is one reason code: BRG-FAIL — spindle bearings, worsening monthly."</div></div>
+    <div class="cell"><div class="k">+ Cost-Leakage Hunter</div>
+      <div class="v">"That bearing costs you ~$8k/month. A $15k spindle overhaul pays back in under 8 weeks."</div></div>
+    <div class="cell"><div class="k">+ Schedule Auditor</div>
+      <div class="v">"It also explains why 40% of CNC-01's orders finish late — fix one thing, heal two KPIs."</div></div>
+    <div class="cell"><div class="k">= The point</div>
+      <div class="v">From a percentage to a purchase order. That's the enhancement. 🔧</div></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+j("/api/agents").then(crew => {
+  const byName = Object.fromEntries(crew.map(a => [a.name, a]));
+  document.querySelectorAll(".modelchip").forEach(el => {
+    const a = byName[el.dataset.agent];
+    if (a) el.textContent = a.enabled ? a.model : "benched";
+  });
+  const live = document.getElementById("cfg-live");
+  if (live) live.textContent = crew.filter(a=>a.enabled).length + " agents on " +
+    [...new Set(crew.filter(a=>a.enabled).map(a=>a.model))].join(", ");
+}).catch(()=>{});
+</script>
+{% endblock %}

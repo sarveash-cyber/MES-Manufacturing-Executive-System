@@ -1,0 +1,33 @@
+[project]
+name = "mes-system"
+version = "0.1.0"
+description = "MES analytics base: OEE & loss KPIs over production history, with a Claude multi-agent layer for money-leak diagnosis"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.29",
+    "sqlalchemy>=2.0",
+    "pandas>=2.1",
+    "pydantic>=2.5",
+    "jinja2>=3.1",
+    "python-dotenv>=1.0",
+    "pyyaml>=6.0",
+    "claude-agent-sdk>=0.1.0",
+]
+
+[project.optional-dependencies]
+kaggle = ["kagglehub>=0.3"]
+
+[dependency-groups]
+dev = ["pytest>=8.0", "httpx>=0.27"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

@@ -1,0 +1,358 @@
+{% extends "base.html" %}
+{% block title %}Sales Advisor — MoneyWrench MES{% endblock %}
+{% block head %}
+<style>
+.adv{grid-template-columns:repeat(auto-fit,minmax(460px,1fr))}
+.wide{grid-column:1/-1}
+.stepno{font-family:var(--font-mono);font-size:10.5px;color:var(--amber);
+  letter-spacing:.12em;text-transform:uppercase;margin-bottom:4px}
+h3.sec{margin:0 0 10px;font-size:15px}
+.numin{display:grid;grid-template-columns:minmax(0,1fr) 110px;gap:8px;align-items:center;margin:5px 0}
+.numin label{color:var(--muted);font-size:12px}
+.numin input{width:110px}
+.numin.field-wide{grid-template-columns:minmax(0,1fr) 180px}
+.numin.field-wide input,.numin.field-wide select{width:100%}
+.pains{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+.pain{border:1px solid var(--line);border-radius:99px;padding:7px 13px;cursor:pointer;
+  font-size:12.5px;color:var(--muted);background:var(--panel-2);user-select:none}
+.pain.on{color:var(--cyan);border-color:color-mix(in srgb,var(--cyan) 45%,transparent);
+  background:color-mix(in srgb,var(--cyan) 12%,transparent);font-weight:600}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.seg button{background:var(--panel-2);border:0;color:var(--muted);padding:9px 16px;
+  font:600 12px var(--font-mono);cursor:pointer;text-transform:uppercase;letter-spacing:.05em}
+.seg button.on{background:color-mix(in srgb,var(--amber) 18%,transparent);color:var(--amber)}
+.basis{font-family:var(--font-mono);font-size:10.5px;color:var(--muted);margin-top:8px;max-width:760px}
+.levers{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px}
+.lever{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;
+  box-shadow:var(--shadow);position:relative}
+.lever.off{opacity:.45}
+.lever.excluded{opacity:.35;pointer-events:none;border-style:dashed}
+.lever .top{display:flex;align-items:center;gap:9px}
+.lever .top input[type=checkbox]{width:16px;height:16px;accent-color:var(--cyan)}
+.lever h4{margin:0;font-size:13.5px;flex:1}
+.lever .agent{font-family:var(--font-mono);font-size:9.5px;color:var(--cyan);
+  border:1px solid var(--line);border-radius:99px;padding:2px 8px;white-space:nowrap}
+.lever .act{font-size:11.5px;color:var(--muted);margin:8px 0}
+.lever .frm{font-family:var(--font-mono);font-size:10px;color:var(--muted);
+  border-top:1px dashed var(--line);padding-top:6px;margin-top:8px}
+.lever .base{display:grid;grid-template-columns:minmax(0,1fr) 100px;gap:8px;align-items:center;margin:6px 0}
+.lever .base label{font-size:11px;color:var(--muted)}
+.lever .base input{width:100px;background:var(--panel-2);color:var(--ink);
+  border:1px solid var(--line);border-radius:7px;padding:5px 8px;font:12px var(--font-mono)}
+.lever .uplift{display:grid;grid-template-columns:minmax(0,1fr) 56px;gap:10px;align-items:center;margin:8px 0 2px}
+.lever .uplift output{font-family:var(--font-mono);color:var(--amber);font-size:12px;text-align:right}
+.lever .sav{font-family:var(--font-mono);font-size:15px;font-weight:700;color:var(--good);margin-top:6px}
+.excl-note{font-family:var(--font-mono);font-size:9.5px;color:var(--bad);margin-top:4px}
+.readout{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:14px}
+.ro{background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:12px}
+.ro .k{font-family:var(--font-mono);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em}
+.ro .v{font-size:23px;font-weight:700;font-family:var(--font-mono);margin-top:3px}
+.ro .v.money{color:var(--good)}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+#narrative{white-space:pre-wrap;background:var(--panel-2);border:1px solid var(--line);
+  border-radius:10px;padding:14px;font-size:13px;display:none;margin-top:12px}
+.print-only{display:none}
+@media print{
+  .no-print{display:none !important}
+  .print-only{display:block}
+  .lever .uplift input{display:none}
+  .levers{grid-template-columns:1fr 1fr}
+  .lever,.card{box-shadow:none;break-inside:avoid}
+}
+</style>
+{% endblock %}
+{% block content %}
+<div class="print-only" style="margin-bottom:14px">
+  <h1 style="margin:0">MoneyWrench — Value Hypothesis</h1>
+  <p style="font-family:var(--font-mono);font-size:11px" id="print-meta"></p>
+</div>
+
+<div class="no-print">
+<h1 class="page">Sales Advisor</h1>
+<p class="sub">&gt; your manufacturing SME in a box: profile the client, pick the levers, show them the money. 🧑‍💼</p>
+</div>
+
+<div class="grid adv">
+  <!-- STEP 1: PROFILE -->
+  <div class="card no-print">
+    <div class="stepno">Step 1 — Client profile</div>
+    <h3 class="sec">Who are we talking to?</h3>
+    <div class="numin field-wide"><label>Client / prospect name</label>
+      <input class="field" type="text" id="client-name" placeholder="Acme Gears Ltd"></div>
+    <div class="numin field-wide"><label>Sector pack</label>
+      <select class="field" id="sector"></select></div>
+    <p style="color:var(--muted);font-size:12px;margin:10px 0 4px">Where does it hurt? (picks the levers)</p>
+    <div class="pains" id="pains"></div>
+    <button class="btn" id="demo-fill" style="margin-top:6px">Use demo plant numbers</button>
+  </div>
+
+  <!-- STEP 1b: ECONOMICS -->
+  <div class="card no-print">
+    <div class="stepno">Step 1b — Plant economics</div>
+    <h3 class="sec">Six numbers from the conversation</h3>
+    <div id="econ"></div>
+    <p class="basis">Defaults come from the live demo plant — overwrite with the client's rough numbers.
+      Every formula is documented on each lever card and printed on the leave-behind.</p>
+  </div>
+
+  <!-- STEP 2: SCENARIO + LEVERS -->
+  <div class="card wide">
+    <div class="stepno no-print">Step 2 — Improvement levers &amp; AI uplift scenario</div>
+    <div class="no-print" style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+      <div class="seg" id="scenario">
+        <button data-s="conservative">Conservative</button>
+        <button data-s="expected" class="on">Expected</button>
+        <button data-s="aggressive">Aggressive</button>
+      </div>
+      <span class="basis" id="mc-basis"></span>
+    </div>
+    <div class="levers" id="levers" style="margin-top:14px"></div>
+  </div>
+
+  <!-- STEP 3: READOUT -->
+  <div class="card wide">
+    <div class="stepno">Step 3 — What it's worth</div>
+    <div class="readout" id="readout"></div>
+    <div class="chart-wrap no-print" style="height:230px"><canvas id="savChart"></canvas></div>
+    <div class="numin no-print" style="max-width:420px"><label>Engagement cost assumption ($)</label>
+      <input class="field" type="number" id="engagement" value="150000" step="10000"></div>
+    <div class="actions no-print">
+      <button class="btn" onclick="window.print()">🖨️ Print leave-behind</button>
+      <button class="btn" id="pitch-btn" style="background:var(--amber)">🤖 Ask the crew to write the pitch</button>
+    </div>
+    <div id="narrative"></div>
+    <p class="basis" id="assumptions"></p>
+    <div class="print-only" style="border:1px solid var(--line);border-radius:10px;padding:12px;margin-top:12px">
+      <b>Next step:</b> a 3-week Money-Bleed Audit on your own production history —
+      one data extract, a ranked list of leaks in dollars, and the agent crew configured
+      to your reason codes. No plant downtime, no software purchase.
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let KB = null, scenario = "expected", chart = null;
+const $ = id => document.getElementById(id);
+const money = n => "$" + fmt0(n);
+const state = { pains: new Set(), levers: {}, econ: {}, base: {} };
+
+/* per-lever: baseline field spec + savings calc(baseline, upliftFraction, econ) */
+const CALC = {
+  oee:        {label:"Current OEE (%)", key:"oee_pct",
+    calc:(b,u,e)=>{const cur=b/100, cap=e.good_units_per_day/Math.max(cur,.05);
+      const tgt=Math.min(.90,cur*(1+u)); return Math.max(0,(tgt-cur))*cap*e.margin_per_unit*e.working_days;}},
+  downtime:   {label:"Unplanned downtime (h/day)", key:"unplanned_h_per_day",
+    calc:(b,u,e)=>b*u*e.machine_rate*e.working_days},
+  changeover: {label:"Changeover time (h/day)", key:"changeover_h_per_day",
+    calc:(b,u,e)=>b*u*e.machine_rate*e.working_days},
+  scrap:      {label:"Scrap (units/day)", key:"scrap_units_per_day",
+    calc:(b,u,e)=>b*u*(state.base.scrap_cost_per_unit||4)*e.working_days},
+  otd:        {label:"Late orders (per day)", key:"late_orders_per_day",
+    calc:(b,u,e)=>b*u*e.cost_per_late_order*e.working_days},
+  inventory:  {label:"Avg inventory value ($)", key:"inventory_value",
+    calc:(b,u,e)=>b*u*(state.base.carry_rate||0.25)},
+  energy:     {label:"Energy use (kWh/yr)", key:"kwh_per_year",
+    calc:(b,u,e)=>b*u*e.tariff},
+  labour:     {label:"Direct labour (h/day)", key:"labour_hours_per_day",
+    calc:(b,u,e)=>b*u*e.loaded_wage*e.working_days},
+  maintenance:{label:"Maintenance spend ($/yr)", key:"maintenance_cost_per_year",
+    calc:(b,u,e)=>b*u},
+  audit:      {label:"Audit prep (h/yr)", key:"audit_hours_per_year",
+    calc:(b,u,e)=>b*u*e.loaded_wage},
+};
+const ECON_FIELDS = [
+  ["machines","Machines / lines"],["hours_per_day","Production hours/day"],
+  ["good_units_per_day","Good units/day"],["margin_per_unit","Margin per unit ($)"],
+  ["machine_rate","Machine hour rate ($/h)"],["working_days","Working days/yr"],
+  ["tariff","Energy tariff ($/kWh)"],["loaded_wage","Loaded wage ($/h)"],
+  ["cost_per_late_order","Cost per late order ($)"],
+];
+
+async function boot(){
+  const [kb, agents] = await Promise.all([j("/api/advisor/kb"), j("/api/agents")]);
+  KB = kb; KB.agentModels = Object.fromEntries(agents.map(a=>[a.name,a.model]));
+  $("mc-basis").textContent = "Expected scenario basis: " + kb.mc_basis;
+  // sector packs
+  $("sector").innerHTML = kb.sectors.map(s =>
+    `<option value="${s.key}" ${s.live?"":"disabled"}>${s.label}</option>`).join("");
+  // pains
+  $("pains").innerHTML = Object.entries(kb.pain_points).map(([k,p]) =>
+    `<span class="pain" data-k="${k}">${p.icon} ${p.label}</span>`).join("");
+  document.querySelectorAll(".pain").forEach(el => el.addEventListener("click", () => {
+    el.classList.toggle("on");
+    el.classList.contains("on") ? state.pains.add(el.dataset.k) : state.pains.delete(el.dataset.k);
+    autoselect(); render();
+  }));
+  // economics
+  state.econ = {...kb.economics};
+  $("econ").innerHTML = ECON_FIELDS.map(([k,l]) =>
+    `<div class="numin"><label>${l}</label><input class="field" type="number" step="any"
+       data-e="${k}" value="${kb.economics[k]}"></div>`).join("");
+  document.querySelectorAll("#econ input").forEach(i => i.addEventListener("input", () => {
+    state.econ[i.dataset.e] = +i.value || 0; render();
+  }));
+  // baselines + levers (all selected=false until pains chosen; audit default hours)
+  state.base = {...kb.baselines, audit_hours_per_year: kb.economics.audit_hours_per_year};
+  for (const id of Object.keys(kb.levers))
+    state.levers[id] = {on:false, uplift:kb.levers[id].uplift[scenario],
+                        baseline:+(state.base[CALC[id].key] ?? 0)};
+  buildLevers(); render();
+}
+
+function autoselect(){
+  for (const [id, lv] of Object.entries(KB.levers))
+    state.levers[id].on = lv.pains.some(p => state.pains.has(p));
+  applyExclusions();
+  syncLeverDOM();
+}
+
+function applyExclusions(){
+  // OEE-family double-count guard: if oee is on, its components go off (and vice versa)
+  const oeeOn = state.levers.oee?.on;
+  for (const [id, lv] of Object.entries(KB.levers)){
+    const exclByOee = (KB.levers.oee.excludes||[]).includes(id);
+    if (oeeOn && exclByOee) state.levers[id].on = false;
+  }
+}
+
+function buildLevers(){
+  $("levers").innerHTML = Object.entries(KB.levers).map(([id, lv]) => {
+    const c = CALC[id];
+    return `<div class="lever off" id="lv-${id}">
+      <div class="top">
+        <input type="checkbox" data-l="${id}">
+        <h4>${lv.icon} ${lv.name}</h4>
+        <span class="agent">🤖 ${lv.agent} · ${KB.agentModels[lv.agent]||"?"}</span>
+      </div>
+      <div class="act">${lv.ai_action}</div>
+      <div class="base"><label>${c.label}</label>
+        <input type="number" step="any" data-b="${id}" value="${state.levers[id].baseline}"></div>
+      <div class="uplift">
+        <input type="range" min="0" max="70" step="1" data-u="${id}"
+               value="${Math.round(state.levers[id].uplift*100)}">
+        <output id="u-${id}">${Math.round(state.levers[id].uplift*100)}%</output>
+      </div>
+      <div class="sav" id="sav-${id}">–</div>
+      <div class="excl-note" id="ex-${id}" style="display:none">covered by the OEE lever (double-count guard)</div>
+      <div class="frm">${lv.formula}<br><i>${lv.uplift_basis}</i></div>
+    </div>`;
+  }).join("");
+  document.querySelectorAll("[data-l]").forEach(cb => cb.addEventListener("change", () => {
+    state.levers[cb.dataset.l].on = cb.checked; applyExclusions(); syncLeverDOM(); render();
+  }));
+  document.querySelectorAll("[data-b]").forEach(i => i.addEventListener("input", () => {
+    state.levers[i.dataset.b].baseline = +i.value || 0; render();
+  }));
+  document.querySelectorAll("[data-u]").forEach(s => s.addEventListener("input", () => {
+    state.levers[s.dataset.u].uplift = +s.value/100;
+    $("u-"+s.dataset.u).textContent = s.value + "%"; render();
+  }));
+}
+
+function syncLeverDOM(){
+  const oeeOn = state.levers.oee?.on;
+  for (const id of Object.keys(KB.levers)){
+    const el = $("lv-"+id), st = state.levers[id];
+    el.querySelector("[data-l]").checked = st.on;
+    el.classList.toggle("off", !st.on);
+    const excluded = oeeOn && (KB.levers.oee.excludes||[]).includes(id);
+    el.classList.toggle("excluded", excluded);
+    $("ex-"+id).style.display = excluded ? "block" : "none";
+    // oee card disabled when any component lever is on
+    if (id === "oee"){
+      const compOn = (KB.levers.oee.excludes||[]).some(k => state.levers[k]?.on);
+      el.classList.toggle("excluded", compOn && !st.on);
+    }
+  }
+}
+
+function render(){
+  if (!KB) return;
+  let total = 0; const rows = [];
+  for (const [id, lv] of Object.entries(KB.levers)){
+    const st = state.levers[id];
+    const val = st.on ? CALC[id].calc(st.baseline, st.uplift, state.econ) : 0;
+    $("sav-"+id).textContent = st.on ? money(val) + "/yr" : "–";
+    if (st.on && val > 0){ total += val; rows.push({name:lv.icon+" "+lv.name, val, agent:lv.agent}); }
+  }
+  const cost = +$("engagement").value || 1;
+  const roi = total/cost*100, payback = total>0 ? cost/total*12 : 0;
+  $("readout").innerHTML =
+    `<div class="ro"><div class="k">Annual savings</div><div class="v money">${money(total)}</div></div>
+     <div class="ro"><div class="k">Levers selected</div><div class="v">${rows.length}</div></div>
+     <div class="ro"><div class="k">ROI (year 1)</div><div class="v">${roi.toFixed(0)}%</div></div>
+     <div class="ro"><div class="k">Payback</div><div class="v">${payback>0?payback.toFixed(1)+" mo":"–"}</div></div>
+     <div class="ro"><div class="k">3-year value</div><div class="v money">${money(total*3-cost)}</div></div>`;
+  $("assumptions").textContent = `Assumptions: ${scenario} scenario · ${state.econ.working_days} working days/yr · ` +
+    `engagement ${money(cost)} · savings are annual run-rate once agents are live. ` +
+    `Expected uplifts: ${KB.mc_basis}.`;
+  $("print-meta").textContent = `Prepared for ${$("client-name").value || "(client)"} · ` +
+    new Date().toLocaleDateString() + ` · ${scenario} scenario · MoneyWrench Sales Advisor`;
+  rows.sort((a,b)=>b.val-a.val);
+  if (chart) chart.destroy();
+  chart = new Chart($("savChart"), {type:"bar",
+    data:{labels:rows.map(r=>r.name),
+      datasets:[{data:rows.map(r=>r.val),backgroundColor:PALETTE,borderRadius:6}]},
+    options:{indexAxis:"y",maintainAspectRatio:false,plugins:{legend:{display:false},
+      tooltip:{callbacks:{label:c=>money(c.raw)+"/yr · agent: "+rows[c.dataIndex].agent}}},
+      scales:{x:{ticks:{callback:v=>"$"+fmt0(v)}}}}});
+}
+
+document.querySelectorAll("#scenario button").forEach(b => b.addEventListener("click", () => {
+  document.querySelectorAll("#scenario button").forEach(x=>x.classList.remove("on"));
+  b.classList.add("on"); scenario = b.dataset.s;
+  for (const [id, lv] of Object.entries(KB.levers)){
+    state.levers[id].uplift = lv.uplift[scenario];
+    const s = document.querySelector(`[data-u="${id}"]`);
+    s.value = Math.round(lv.uplift[scenario]*100);
+    $("u-"+id).textContent = s.value + "%";
+  }
+  render();
+}));
+$("engagement").addEventListener("input", render);
+$("demo-fill").addEventListener("click", () => {
+  for (const id of Object.keys(KB.levers)){
+    state.levers[id].baseline = +(state.base[CALC[id].key] ?? 0);
+    document.querySelector(`[data-b="${id}"]`).value = state.levers[id].baseline;
+  }
+  if (!state.pains.size){  // pick a demo story if nothing chosen
+    ["downtime","quality","energy"].forEach(k => {
+      document.querySelector(`.pain[data-k="${k}"]`).classList.add("on"); state.pains.add(k);
+    });
+    autoselect();
+  }
+  render();
+});
+
+$("pitch-btn").addEventListener("click", async () => {
+  const out = $("narrative"), btn = $("pitch-btn");
+  const sel = Object.entries(state.levers).filter(([,s])=>s.on);
+  if (!sel.length){ out.style.display="block"; out.textContent="Select at least one lever first."; return; }
+  btn.disabled = true; out.style.display = "block";
+  out.textContent = "⚙️ The crew is drafting the pitch…";
+  const summary = sel.map(([id,s]) =>
+    `${KB.levers[id].name}: baseline ${s.baseline}, AI uplift ${(s.uplift*100).toFixed(0)}%, ` +
+    `est. ${money(CALC[id].calc(s.baseline,s.uplift,state.econ))}/yr (agent: ${KB.levers[id].agent})`).join("\n");
+  const q = `You are writing FOR a sales executive. Using ONLY the numbers below (do not re-derive from the demo database), ` +
+    `write a crisp executive pitch summary (~200 words) for ${$("client-name").value || "the client"}: ` +
+    `headline savings, the 2-3 biggest levers with dollars, how the AI agents deliver each, ` +
+    `and a closing call to action for a 3-week Money-Bleed Audit.\n\nScenario: ${scenario}\n${summary}\n` +
+    `Total annual savings: ${$("readout").querySelector(".v.money").textContent}, ` +
+    `engagement cost ${money(+$("engagement").value)}.`;
+  try{
+    const r = await fetch("/analyze", {method:"POST", headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({question:q})});
+    const d = await r.json();
+    out.textContent = r.ok ? d.answer : (d.detail || "Agent crew unavailable — is Claude auth configured on the server?");
+  }catch(e){ out.textContent = "Error: " + e.message; }
+  btn.disabled = false;
+});
+
+boot().catch(e => {
+  document.querySelector("main").insertAdjacentHTML("beforeend",
+    `<p style="color:var(--bad);font-family:var(--font-mono)">Failed to load advisor KB: ${e.message}</p>`);
+});
+</script>
+{% endblock %}

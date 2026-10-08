@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — MoneyWrench MES{% endblock %}
+{% block head %}
+<style>
+.stats{grid-template-columns:repeat(auto-fit,minmax(170px,1fr));margin-bottom:16px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+.stat .k{font-family:var(--font-mono);font-size:10.5px;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.12em}
+.stat .v{font-size:26px;font-weight:700;margin-top:4px}
+.stat .d{font-size:11.5px;color:var(--muted);font-family:var(--font-mono)}
+.charts{grid-template-columns:repeat(auto-fit,minmax(440px,1fr))}
+.wide{grid-column:1/-1}
+#answer{white-space:pre-wrap;margin-top:12px;background:var(--panel-2);border:1px solid var(--line);
+  border-radius:10px;padding:14px;display:none;font-family:var(--font-mono);font-size:12.5px}
+#ask-row{display:flex;gap:10px}
+#question{flex:1}
+.leak{color:var(--bad)}
+.drip{display:inline-block;animation:drip 1.6s ease-in infinite}
+@keyframes drip{0%{transform:translateY(-2px);opacity:0}30%{opacity:1}100%{transform:translateY(8px);opacity:0}}
+</style>
+{% endblock %}
+{% block content %}
+<h1 class="page">Plant Control Room</h1>
+<p class="sub">&gt; scanning production history for leaks… found some. 💸<span class="drip">💧</span></p>
+
+<div class="grid stats" id="stat-cards"></div>
+
+<div class="grid charts">
+  <div class="card"><h2>OEE trend by month (plant)</h2><div class="chart-wrap"><canvas id="oeeTrend"></canvas></div></div>
+  <div class="card"><h2>Availability × Performance × Quality by machine</h2><div class="chart-wrap"><canvas id="apq"></canvas></div></div>
+  <div class="card"><h2>Downtime Pareto — unplanned, by reason</h2><div class="chart-wrap"><canvas id="pareto"></canvas></div></div>
+  <div class="card"><h2>Money bleed by loss bucket ($)</h2><div class="chart-wrap"><canvas id="moneyBuckets"></canvas></div></div>
+
+  <div class="card wide">
+    <h2>Top money leaks — machine × loss bucket <span class="drip">💧</span></h2>
+    <table id="leaksTable">
+      <thead><tr><th>Machine</th><th>Loss bucket</th><th class="num">Minutes lost</th><th class="num">Cost ($)</th><th>Severity</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div class="card wide">
+    <h2>Schedule adherence — plan vs reality</h2>
+    <table id="adherenceTable">
+      <thead><tr><th>Machine</th><th class="num">Orders</th><th class="num">On-time %</th>
+        <th class="num">Avg start delay (min)</th><th class="num">Avg overrun (min)</th><th>Verdict</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div class="card wide">
+    <h2>Ask the analyst crew (multi-agent)</h2>
+    <div id="ask-row">
+      <input id="question" class="field" placeholder='e.g. "Where am I bleeding the most money, and why?"'>
+      <button id="ask-btn" class="btn">Deploy agents</button>
+    </div>
+    <div id="answer"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function statCard(k, v, d, cls=""){
+  return `<div class="stat"><div class="k">${k}</div><div class="v ${cls}">${v}</div><div class="d">${d}</div></div>`;
+}
+
+(async () => {
+  const [byMonth, byMachine, plant, pareto, buckets, leaks, adherence] = await Promise.all([
+    j("/kpi/oee?group_by=month"), j("/kpi/oee?group_by=machine"), j("/kpi/oee?group_by=plant"),
+    j("/kpi/downtime-pareto?by=reason_code"), j("/kpi/money-leaks?totals=true"),
+    j("/kpi/money-leaks?group_by=machine"), j("/kpi/schedule-adherence?group_by=machine"),
+  ]);
+
+  // ---- stat cards ----
+  const p = plant[0] || {};
+  const totalBleed = buckets.reduce((s,r)=>s+r.cost,0);
+  const worst = leaks[0] || {};
+  const worstOee = [...byMachine].sort((a,b)=>a.oee-b.oee)[0] || {};
+  document.getElementById("stat-cards").innerHTML =
+    statCard("Plant OEE", pct1(p.oee), "world-class ≈ 85%", p.oee>=0.85?"":"leak") +
+    statCard("Availability", pct1(p.availability), "run time / planned time") +
+    statCard("Performance", pct1(p.performance), "ideal time / run time") +
+    statCard("Quality", pct1(p.quality), "good / total units") +
+    statCard("Money bleed", "$"+fmt0(totalBleed), "total across history", "leak") +
+    statCard("Biggest leak", worst.machine||"–", (worst.label||"")+" · $"+fmt0(worst.cost||0), "leak") +
+    statCard("Problem child", worstOee.machine||"–", "lowest OEE: "+pct1(worstOee.oee), "leak");
+
+  // ---- charts ----
+  new Chart(document.getElementById("oeeTrend"), {
+    type:"line",
+    data:{labels:byMonth.map(r=>r.month),datasets:[
+      {label:"OEE",data:byMonth.map(r=>r.oee),borderColor:C("--cyan"),tension:.3},
+      {label:"Availability",data:byMonth.map(r=>r.availability),borderColor:C("--good"),tension:.3},
+      {label:"Performance",data:byMonth.map(r=>r.performance),borderColor:C("--amber"),tension:.3},
+      {label:"Quality",data:byMonth.map(r=>r.quality),borderColor:C("--bad"),tension:.3}]},
+    options:{maintainAspectRatio:false,scales:{y:{min:0,max:1,ticks:{callback:v=>(v*100)+"%"}}}}
+  });
+
+  new Chart(document.getElementById("apq"), {
+    type:"bar",
+    data:{labels:byMachine.map(r=>r.machine),datasets:[
+      {label:"Availability",data:byMachine.map(r=>r.availability),backgroundColor:C("--good")},
+      {label:"Performance",data:byMachine.map(r=>r.performance),backgroundColor:C("--amber")},
+      {label:"Quality",data:byMachine.map(r=>r.quality),backgroundColor:C("--bad")},
+      {label:"OEE",data:byMachine.map(r=>r.oee),backgroundColor:C("--cyan")}]},
+    options:{maintainAspectRatio:false,scales:{y:{min:0,max:1,ticks:{callback:v=>(v*100)+"%"}}}}
+  });
+
+  const top = pareto.slice(0,10);
+  new Chart(document.getElementById("pareto"), {
+    data:{labels:top.map(r=>r.reason_code),datasets:[
+      {type:"bar",label:"Minutes",data:top.map(r=>r.minutes),backgroundColor:C("--cyan"),yAxisID:"y"},
+      {type:"line",label:"Cumulative %",data:top.map(r=>r.cum_pct),borderColor:C("--amber"),yAxisID:"y2",tension:.3}]},
+    options:{maintainAspectRatio:false,
+      scales:{y:{beginAtZero:true},y2:{position:"right",min:0,max:100,grid:{drawOnChartArea:false}}}}
+  });
+
+  new Chart(document.getElementById("moneyBuckets"), {
+    type:"doughnut",
+    data:{labels:buckets.map(r=>r.label),datasets:[{data:buckets.map(r=>r.cost),backgroundColor:PALETTE,borderColor:C("--panel")}]},
+    options:{maintainAspectRatio:false}
+  });
+
+  // ---- tables ----
+  const maxCost = Math.max(...leaks.map(r=>r.cost), 1);
+  document.querySelector("#leaksTable tbody").innerHTML = leaks.slice(0,12).map(r=>{
+    const sev = r.cost > maxCost*0.6 ? '<span class="pill bad">GUSHING</span>'
+             : r.cost > maxCost*0.25 ? '<span class="pill warn">DRIPPING</span>'
+             : '<span class="pill good">DAMP</span>';
+    return `<tr><td>${r.machine}</td><td>${r.label}</td><td class="num">${fmt0(r.minutes_lost)}</td>`+
+           `<td class="num cost">$${fmt0(r.cost)}</td><td>${sev}</td></tr>`;
+  }).join("");
+
+  document.querySelector("#adherenceTable tbody").innerHTML = adherence.map(r=>{
+    const verdict = r.on_time_pct >= 85 ? '<span class="pill good">ON PLAN</span>'
+                  : r.on_time_pct >= 60 ? '<span class="pill warn">SLIPPING</span>'
+                  : '<span class="pill bad">FANTASY SCHEDULE</span>';
+    return `<tr><td>${r.machine}</td><td class="num">${fmt0(r.orders)}</td><td class="num">${r.on_time_pct}%</td>`+
+           `<td class="num">${fmt0(r.avg_start_delay_min)}</td><td class="num">${fmt0(r.avg_overrun_min)}</td><td>${verdict}</td></tr>`;
+  }).join("");
+})().catch(e => {
+  document.querySelector("main").insertAdjacentHTML("beforeend",
+    `<p style="color:#ff5d5d;font-family:var(--font-mono)">Failed to load KPIs: ${e.message}. `+
+    `Seed some history first: <code>python scripts/seed.py</code></p>`);
+});
+
+document.getElementById("ask-btn").addEventListener("click", async () => {
+  const btn = document.getElementById("ask-btn"), out = document.getElementById("answer");
+  const q = document.getElementById("question").value.trim();
+  if (!q) return;
+  btn.disabled = true; out.style.display = "block";
+  out.textContent = "⚙️ Agents dispatched. Interrogating the database…";
+  try {
+    const r = await fetch("/analyze", {method:"POST",
+      headers:{"Content-Type":"application/json"}, body:JSON.stringify({question:q})});
+    const data = await r.json();
+    out.textContent = r.ok ? data.answer : (data.detail || "Agent crew unavailable");
+  } catch (e) { out.textContent = "Error: " + e.message; }
+  btn.disabled = false;
+});
+document.getElementById("question").addEventListener("keydown", e => {
+  if (e.key === "Enter") document.getElementById("ask-btn").click();
+});
+</script>
+{% endblock %}

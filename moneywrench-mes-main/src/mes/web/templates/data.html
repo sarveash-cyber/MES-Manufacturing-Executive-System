@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Data Sources — MoneyWrench MES{% endblock %}
+{% block head %}
+<style>
+.srcgrid{grid-template-columns:repeat(auto-fit,minmax(380px,1fr));margin-bottom:26px}
+.src .head{display:flex;align-items:center;gap:10px}
+.src .head .ic{font-size:26px}
+.src h3{margin:0;font-size:15px}
+.src .kind{margin-left:auto;font-family:var(--font-mono);font-size:10px;color:var(--amber);
+  border:1px solid var(--line);border-radius:99px;padding:2px 9px}
+.src p{font-size:12.5px;color:var(--muted);margin:8px 0}
+.src .cite{font-family:var(--font-mono);font-size:11px;color:var(--muted);
+  border-left:3px solid var(--cyan);padding:6px 10px;
+  background:color-mix(in srgb,var(--cyan) 7%,transparent);border-radius:0 8px 8px 0}
+.src code{font-size:11px;background:var(--panel-2);border:1px solid var(--line);
+  border-radius:6px;padding:2px 7px;display:inline-block;margin-top:6px}
+.tbl{margin-bottom:18px}
+.tbl .head{display:flex;align-items:baseline;gap:10px;margin-bottom:8px}
+.tbl .head .ic{font-size:22px}
+.tbl h3{margin:0;font-size:15px}
+.tbl .rows{margin-left:auto;font-family:var(--font-mono);font-size:11px;color:var(--cyan)}
+.tbl .purpose{color:var(--muted);font-size:12.5px;margin:0 0 10px}
+.flowline{font-family:var(--font-mono);font-size:12px;color:var(--muted);
+  background:var(--panel-2);border:1px solid var(--line);border-radius:10px;
+  padding:12px 14px;margin-bottom:22px;overflow-x:auto;white-space:nowrap}
+.flowline b{color:var(--cyan)}
+</style>
+{% endblock %}
+{% block content %}
+<h1 class="page">Data Sources — where the numbers come from</h1>
+<p class="sub">&gt; three ways in, one canonical schema, zero invented numbers. every KPI on every page traces back to a column below.</p>
+
+<div class="flowline">
+  <b>sources</b> (synthetic · UCI AI4I · Kaggle downtime) → <b>adapters</b> (src/mes/ingest/) →
+  <b>canonical schema</b> (SQLite, tables below) → <b>KPI engine</b> (pandas) →
+  <b>dashboard · subsystems · agents</b>
+</div>
+
+<h2 style="font-size:14px;letter-spacing:.08em;font-family:var(--font-mono);color:var(--muted)">INGESTION SOURCES</h2>
+<div class="grid srcgrid">
+  {% for s in sources %}
+  <div class="card src">
+    <div class="head"><span class="ic">{{ s.icon }}</span><h3>{{ s.name }}</h3>
+      <span class="kind">{{ s.kind }}</span></div>
+    <p>{{ s.what }}</p>
+    <p><b style="color:var(--ink)">How it influences the KPIs:</b> {{ s.influences }}</p>
+    <div class="cite">{{ s.cite }}{% if s.link %} — <a href="{{ s.link }}" target="_blank">source ↗</a>{% endif %}</div>
+    <code>{{ s.command }}</code>
+  </div>
+  {% endfor %}
+</div>
+
+<h2 style="font-size:14px;letter-spacing:.08em;font-family:var(--font-mono);color:var(--muted)">CANONICAL SCHEMA — TABLES, COLUMNS & KPI INFLUENCE</h2>
+{% for t in tables %}
+<div class="card tbl">
+  <div class="head"><span class="ic">{{ t.icon }}</span><h3>{{ t.name }}</h3>
+    <span class="rows">{{ "{:,}".format(t.rows) }} rows live</span></div>
+  <p class="purpose">{{ t.purpose }}</p>
+  <table>
+    <thead><tr><th style="width:26%">Column</th><th style="width:34%">What it is</th><th>Which KPIs it influences</th></tr></thead>
+    <tbody>
+    {% for c in t.columns %}
+      <tr><td><code style="background:transparent;border:0;padding:0">{{ c.column }}</code></td>
+          <td>{{ c.description }}</td><td>{{ c.influences }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endfor %}
+{% endblock %}

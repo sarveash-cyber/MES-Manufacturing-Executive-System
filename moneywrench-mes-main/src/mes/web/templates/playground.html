@@ -1,0 +1,477 @@
+{% extends "base.html" %}
+{% block title %}KPI Playground — MoneyWrench MES{% endblock %}
+{% block head %}
+<style>
+.pg{grid-template-columns:repeat(auto-fit,minmax(460px,1fr))}
+.wide{grid-column:1/-1}
+.formula{font-family:var(--font-mono);font-size:15px;background:var(--panel-2);
+  border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:10px 0}
+.formula b{color:var(--amber)}
+.formula .val{color:var(--cyan)}
+.sliders{display:flex;flex-direction:column;gap:14px;margin-top:8px}
+.srow{display:grid;grid-template-columns:26px 130px minmax(0,1fr) 64px;gap:10px;align-items:center}
+.srow .gear{font-size:20px;display:inline-block;animation:spin linear infinite}
+.srow label{font-weight:600}
+.srow output{font-family:var(--font-mono);color:var(--cyan);text-align:right}
+input[type=range]{-webkit-appearance:none;width:100%;height:6px;border-radius:3px;
+  background:linear-gradient(90deg,var(--amber),var(--cyan));outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;
+  border-radius:50%;background:var(--ink);border:3px solid var(--amber);cursor:grab}
+.bigmeter{display:flex;align-items:center;gap:22px;margin-top:6px}
+.mastergear{font-size:74px;display:inline-block;animation:spin linear infinite;filter:drop-shadow(0 0 12px #ffb00055)}
+.oeeval{font-size:44px;font-weight:700}
+.oeeval small{display:block;font-size:12px;color:var(--muted);font-family:var(--font-mono);font-weight:400}
+.chain{display:flex;flex-wrap:wrap;gap:8px;align-items:stretch;margin-top:10px}
+.node{background:var(--panel-2);border:1px solid var(--line);border-radius:10px;
+  padding:10px 12px;min-width:130px;flex:1}
+.node .k{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;font-family:var(--font-mono)}
+.node .v{font-size:18px;font-weight:700;font-family:var(--font-mono);margin-top:3px}
+.node.money .v{color:var(--bad)}
+.node.good .v{color:var(--good)}
+.arrow{align-self:center;color:var(--amber);font-size:18px}
+.numin{display:grid;grid-template-columns:minmax(0,1fr) 110px;gap:8px;align-items:center;margin:6px 0}
+.numin label{color:var(--muted);font-size:12.5px}
+.numin input{width:110px}
+.callout{border-left:3px solid var(--amber);padding:8px 12px;
+  background:color-mix(in srgb,var(--amber) 8%,transparent);
+  font-size:12.5px;color:var(--muted);border-radius:0 8px 8px 0;margin-top:10px}
+.faucet{font-size:26px}
+.dripline{display:inline-flex;flex-direction:column;height:26px;overflow:hidden;vertical-align:middle}
+.dripline span{animation:drip ease-in infinite}
+@keyframes drip{0%{transform:translateY(-6px);opacity:0}30%{opacity:1}100%{transform:translateY(16px);opacity:0}}
+h3.sec{margin:2px 0 4px;font-size:15px}
+h3.sec .tag{font-family:var(--font-mono);font-size:10px;color:var(--amber);
+  border:1px solid color-mix(in srgb,var(--amber) 40%,transparent);border-radius:99px;
+  padding:2px 8px;margin-left:8px;vertical-align:2px}
+/* ---- full KPI matrix calculators ---- */
+h2.domain{font-size:13px;letter-spacing:.1em;font-family:var(--font-mono);color:var(--muted);
+  text-transform:uppercase;margin:34px 0 12px;display:flex;align-items:center;gap:10px}
+h2.domain::after{content:"";flex:1;height:1px;background:var(--line)}
+.calcgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+.calc{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;
+  box-shadow:var(--shadow)}
+.calc h4{margin:0 0 2px;font-size:13.5px}
+.calc .f{font-family:var(--font-mono);font-size:10.5px;color:var(--muted);margin-bottom:10px}
+.ci{display:grid;grid-template-columns:minmax(0,1fr) 92px;gap:8px;align-items:center;margin:5px 0}
+.ci label{color:var(--muted);font-size:11.5px}
+.ci input{width:92px;background:var(--panel-2);color:var(--ink);border:1px solid var(--line);
+  border-radius:7px;padding:6px 8px;font:12px var(--font-mono)}
+.calc .out{margin-top:10px;border-top:1px dashed var(--line);padding-top:8px;
+  font-family:var(--font-mono);font-size:12px;display:flex;flex-direction:column;gap:3px}
+.calc .out b{font-size:15px}
+.calc .out .good{color:var(--good)} .calc .out .warn{color:var(--amber)} .calc .out .bad{color:var(--bad)}
+</style>
+{% endblock %}
+{% block content %}
+<h1 class="page">KPI Playground</h1>
+<p class="sub">&gt; turn the gears. watch the money. every number below reacts live — no factories were bribed.</p>
+
+<div class="grid pg">
+
+  <!-- PLANT SETUP -->
+  <div class="card">
+    <h3 class="sec">🏭 Plant setup <span class="tag">FEEDS EVERYTHING</span></h3>
+    <p class="callout">These parameters flow into every formula on this page. Change one and watch the ripple.</p>
+    <div class="numin"><label>Planned production time (h/day)</label><input class="field" type="number" id="in-hours" value="16" min="1" max="24" step="0.5"></div>
+    <div class="numin"><label>Ideal cycle time (sec/unit)</label><input class="field" type="number" id="in-ct" value="45" min="1" step="1"></div>
+    <div class="numin"><label>Sale price per unit ($)</label><input class="field" type="number" id="in-price" value="9.50" min="0" step="0.5"></div>
+    <div class="numin"><label>Material cost per unit ($)</label><input class="field" type="number" id="in-mat" value="3.20" min="0" step="0.1"></div>
+    <div class="numin"><label>Machine hour rate ($/h)</label><input class="field" type="number" id="in-rate" value="145" min="0" step="5"></div>
+  </div>
+
+  <!-- OEE MACHINE -->
+  <div class="card">
+    <h3 class="sec">⚙️ The OEE machine <span class="tag">A × P × Q</span></h3>
+    <div class="formula">OEE = Availability × Performance × Quality =
+      <b id="f-a">–</b> × <b id="f-p">–</b> × <b id="f-q">–</b> = <span class="val" id="f-oee">–</span></div>
+    <div class="sliders">
+      <div class="srow"><span class="gear" id="g-a">⚙️</span><label>Availability</label>
+        <input type="range" id="sl-a" min="30" max="100" value="87"><output id="o-a"></output></div>
+      <div class="srow"><span class="gear" id="g-p">⚙️</span><label>Performance</label>
+        <input type="range" id="sl-p" min="30" max="100" value="90"><output id="o-p"></output></div>
+      <div class="srow"><span class="gear" id="g-q">⚙️</span><label>Quality</label>
+        <input type="range" id="sl-q" min="30" max="100" value="96"><output id="o-q"></output></div>
+    </div>
+    <div class="bigmeter">
+      <span class="mastergear" id="g-master">⚙️</span>
+      <div class="oeeval"><span id="oee-big">–</span><small id="oee-verdict"></small></div>
+    </div>
+  </div>
+
+  <!-- CASCADE -->
+  <div class="card wide">
+    <h3 class="sec">🔗 The cascade — how the gears move the money</h3>
+    <p class="callout">Availability decides how long the machine runs → Performance decides how fast →
+      Quality decides how much survives → the leftovers are your money bleed. That's the whole MES story in one row.</p>
+    <div class="chain" id="chain"></div>
+    <div class="formula" style="margin-top:14px">
+      Daily bleed = downtime cost + speed-loss cost + scrap cost =
+      <b id="f-dtc">–</b> + <b id="f-spc">–</b> + <b id="f-scc">–</b> =
+      <span class="val" id="f-bleed">–</span>/day
+      <span class="faucet">🚰</span><span class="dripline" id="drips"></span>
+    </div>
+  </div>
+
+  <!-- FPY -->
+  <div class="card">
+    <h3 class="sec">🧪 First Pass Yield <span class="tag">FPY</span></h3>
+    <div class="formula">FPY = (units − scrap − rework) / units =
+      <span class="val" id="f-fpy">–</span></div>
+    <div class="sliders">
+      <div class="srow"><span class="gear" id="g-scrap">⚙️</span><label>Scrap rate</label>
+        <input type="range" id="sl-scrap" min="0" max="20" value="4" step="0.5"><output id="o-scrap"></output></div>
+      <div class="srow"><span class="gear" id="g-rework">⚙️</span><label>Rework rate</label>
+        <input type="range" id="sl-rework" min="0" max="20" value="3" step="0.5"><output id="o-rework"></output></div>
+    </div>
+    <p class="callout" id="fpy-note"></p>
+    <label style="font-size:12.5px;color:var(--muted)">
+      <input type="checkbox" id="link-fpy" checked> Link FPY → OEE Quality gear (scrap feeds the Quality term)
+    </label>
+  </div>
+
+  <!-- ROI -->
+  <div class="card">
+    <h3 class="sec">📈 ROI of fixing the leaks <span class="tag">ROI</span></h3>
+    <div class="numin"><label>Target OEE (%)</label><input class="field" type="number" id="in-target" value="85" min="1" max="100"></div>
+    <div class="numin"><label>Improvement investment ($)</label><input class="field" type="number" id="in-invest" value="120000" min="0" step="5000"></div>
+    <div class="formula">Extra good units/yr = capacity × (OEE<sub>target</sub> − OEE<sub>now</sub>) = <span class="val" id="f-extra">–</span></div>
+    <div class="formula">Annual gain = extra units × margin = <span class="val" id="f-gain">–</span></div>
+    <div class="formula">ROI = gain / investment = <span class="val" id="f-roi">–</span>
+      &nbsp;·&nbsp; payback ≈ <span class="val" id="f-payback">–</span></div>
+    <p class="callout" id="roi-note"></p>
+  </div>
+
+  <!-- INVENTORY (hero) -->
+  <div class="card wide">
+    <h3 class="sec">📦 Inventory management <span class="tag">TURNS & DOI</span></h3>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px">
+      <div>
+        <div class="numin"><label>Annual COGS ($)</label><input class="field" type="number" id="in-cogs" value="2400000" step="50000"></div>
+        <div class="numin"><label>Average inventory value ($)</label><input class="field" type="number" id="in-inv" value="400000" step="10000"></div>
+        <div class="numin"><label>Carrying cost rate (%/yr)</label><input class="field" type="number" id="in-carry" value="25" min="0" max="100"></div>
+      </div>
+      <div>
+        <div class="formula">Inventory turns = COGS / avg inventory = <span class="val" id="f-turns">–</span></div>
+        <div class="formula">Days of inventory = 365 / turns = <span class="val" id="f-doi">–</span></div>
+        <div class="formula">Carrying cost = inventory × rate = <span class="val" id="f-carry">–</span>/yr</div>
+        <p class="callout" id="inv-note"></p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= FULL KPI MATRIX — one calculator per KPI ================= -->
+<h1 class="page" style="margin-top:44px">The full KPI matrix — every formula, interactive</h1>
+<p class="sub">&gt; all 7 domains from the deck, one calculator per KPI. type a number, watch the physics.
+   (OEE, FPY and Inventory Turns have their deluxe versions above.)</p>
+<div id="kpimatrix"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const $ = id => document.getElementById(id);
+const money = n => "$" + fmt0(n);
+
+// gear speed: value 0..1 → animation duration 12s (slow) .. 1.2s (frantic)
+function gearSpeed(el, v){ el.style.animationDuration = (12 - 10.8*Math.min(Math.max(v,0),1)).toFixed(2) + "s"; }
+
+function recompute(){
+  // plant setup
+  const hours = +$("in-hours").value || 16, ct = +$("in-ct").value || 45;
+  const price = +$("in-price").value || 0, mat = +$("in-mat").value || 0, rate = +$("in-rate").value || 0;
+
+  // FPY first (it can drive the Quality gear)
+  const scrap = +$("sl-scrap").value/100, rework = +$("sl-rework").value/100;
+  const fpy = Math.max(0, 1 - scrap - rework);
+  $("o-scrap").textContent = (scrap*100).toFixed(1)+"%";
+  $("o-rework").textContent = (rework*100).toFixed(1)+"%";
+  $("f-fpy").textContent = (fpy*100).toFixed(1)+"%";
+  gearSpeed($("g-scrap"), 1-scrap*4); gearSpeed($("g-rework"), 1-rework*4);
+  $("fpy-note").textContent = fpy >= 0.95
+    ? "FPY ≥ 95% — your parts pass first time. The rework bench is bored. 👌"
+    : "Every reworked unit is paid for twice and every scrapped unit three times (material, time, and the part you didn't make instead).";
+
+  if ($("link-fpy").checked) { $("sl-q").value = Math.round((1-scrap)*100); }
+
+  // OEE
+  const A = +$("sl-a").value/100, P = +$("sl-p").value/100, Q = +$("sl-q").value/100;
+  const oee = A*P*Q;
+  $("o-a").textContent=(A*100).toFixed(0)+"%"; $("o-p").textContent=(P*100).toFixed(0)+"%"; $("o-q").textContent=(Q*100).toFixed(0)+"%";
+  $("f-a").textContent=(A*100).toFixed(0)+"%"; $("f-p").textContent=(P*100).toFixed(0)+"%"; $("f-q").textContent=(Q*100).toFixed(0)+"%";
+  $("f-oee").textContent = (oee*100).toFixed(1)+"%";
+  $("oee-big").textContent = (oee*100).toFixed(1)+"%";
+  $("oee-verdict").textContent = oee>=0.85 ? "world class — frame this screen"
+    : oee>=0.6 ? "typical plant — money is hiding in here"
+    : oee>=0.4 ? "significant losses — the agents would like a word"
+    : "the machine is mostly a very expensive sculpture";
+  gearSpeed($("g-a"),A); gearSpeed($("g-p"),P); gearSpeed($("g-q"),Q); gearSpeed($("g-master"),oee);
+
+  // cascade
+  const plannedMin = hours*60;
+  const runMin = plannedMin*A;
+  const capacity = plannedMin*60/ct;              // ideal units/day at 100% OEE
+  const produced = runMin*60/ct*P;                // actual total units/day
+  const good = produced*Q;
+  const margin = price-mat;
+  const revenue = good*price;
+  const downtimeCost = (plannedMin-runMin)/60*rate;
+  const speedCost = (runMin - produced*ct/60)/60*rate;
+  const scrapCost = (produced-good)*(mat + ct/3600*rate);
+  const bleed = downtimeCost+speedCost+scrapCost;
+
+  const node = (k,v,cls="") => `<div class="node ${cls}"><div class="k">${k}</div><div class="v">${v}</div></div>`;
+  const arrow = `<div class="arrow">→</div>`;
+  $("chain").innerHTML =
+    node("Planned time", fmt0(plannedMin)+" min") + arrow +
+    node("Run time (×A)", fmt0(runMin)+" min") + arrow +
+    node("Units made (×P)", fmt0(produced)+" u") + arrow +
+    node("Good units (×Q)", fmt0(good)+" u","good") + arrow +
+    node("Revenue / day", money(revenue),"good") + arrow +
+    node("Bleed / day", money(bleed),"money");
+  $("f-dtc").textContent = money(downtimeCost);
+  $("f-spc").textContent = money(speedCost);
+  $("f-scc").textContent = money(scrapCost);
+  $("f-bleed").textContent = money(bleed);
+
+  // dripping faucet: more drips = more bleed
+  const nDrips = Math.min(5, Math.max(1, Math.round(bleed/1500)));
+  $("drips").innerHTML = Array.from({length:nDrips},(_,i)=>
+    `<span style="animation-duration:${(1.8-i*0.25).toFixed(2)}s">💧</span>`).join("");
+
+  // ROI
+  const target = Math.min(100,+$("in-target").value||85)/100;
+  const invest = +$("in-invest").value||0;
+  const extra = Math.max(0,(target-oee))*capacity*330; // capacity gap × 330 working days
+  const gain = extra*margin;
+  $("f-extra").textContent = fmt0(extra)+" units";
+  $("f-gain").textContent = money(gain);
+  $("f-roi").textContent = invest>0 ? ((gain/invest)*100).toFixed(0)+"%/yr" : "∞ (free improvements!)";
+  $("f-payback").textContent = gain>0 ? (invest/gain*12).toFixed(1)+" months" : "never";
+  $("roi-note").textContent = target<=oee
+    ? "Target is at or below current OEE. Congratulations, you have already arrived. 🏁"
+    : `Closing the gap from ${(oee*100).toFixed(1)}% to ${(target*100).toFixed(0)}% OEE is worth ${money(gain)} a year in extra good units alone — before counting the bleed you stop.`;
+
+  // Inventory
+  const cogs=+$("in-cogs").value||0, inv=+$("in-inv").value||1, carry=(+$("in-carry").value||0)/100;
+  const turns=cogs/inv, doi=365/Math.max(turns,0.001), carryCost=inv*carry;
+  $("f-turns").textContent = turns.toFixed(1)+"×/yr";
+  $("f-doi").textContent = doi.toFixed(0)+" days";
+  $("f-carry").textContent = money(carryCost);
+  $("inv-note").textContent = turns>=8
+    ? "8+ turns — lean and mean. Your warehouse echoes pleasantly."
+    : turns>=4 ? "Typical for discrete manufacturing. Every extra turn frees cash from the shelves."
+    : "Slow turns: cash is napping on your racks, and it's charging you rent ("+money(carryCost)+"/yr) to do so.";
+}
+
+document.querySelectorAll(".pg input").forEach(el => el.addEventListener("input", recompute));
+recompute();
+
+/* ================= FULL KPI MATRIX — generic calculator engine ================= */
+const P = (v, cls="") => ({v, cls});                 // output line helper
+const st = (x, good, warn, hib=true) => hib ? (x>=good?"good":x>=warn?"warn":"bad")
+                                            : (x<=good?"good":x<=warn?"warn":"bad");
+const sigmaFromDPMO = d => d<=0 ? 6 : Math.max(0, 0.8406 + Math.sqrt(Math.max(0, 29.37 - 2.221*Math.log(d))));
+
+const CALCS = [
+// ─── PRODUCTION ───────────────────────────────────────────────────────────
+{d:"🏭 Production", n:"Throughput", f:"throughput = run h/day × 3600 × OEE / cycle time",
+ i:[["Run hours/day",16],["OEE (%)",62],["Cycle time (s/unit)",45]],
+ c:([h,oee,ct]) => [P(`${fmt0(h*3600*(oee/100)/ct)} good units/day`, "good")]},
+{d:"🏭 Production", n:"Capacity Utilization", f:"utilization = planned production time / calendar time",
+ i:[["Planned production (h/day)",16],["Calendar (h/day)",24]],
+ c:([p,c]) => { const u=p/c*100; return [P(u.toFixed(1)+"%", st(u,70,45)),
+   P(`${(24-p).toFixed(1)} h/day of machine time unsold`)]}},
+{d:"🏭 Production", n:"Cycle Time", f:"actual cycle = run time / units · gap vs ideal",
+ i:[["Run time (min)",420],["Units produced",520],["Ideal cycle (s)",45]],
+ c:([r,u,i2]) => { const a=r*60/u; const gap=(a/i2-1)*100;
+   return [P(`${a.toFixed(1)} s/unit`, st(gap,10,30,false)),
+           P(`${gap>=0?"+":""}${gap.toFixed(1)}% vs ideal`)]}},
+{d:"🏭 Production", n:"Takt Time vs Actual", f:"takt = available time / customer demand",
+ i:[["Available (min/day)",900],["Demand (units/day)",1100],["Actual cycle (s)",48]],
+ c:([a,dm,ac]) => { const t=a*60/dm;
+   return [P(`takt ${t.toFixed(1)} s vs actual ${ac.toFixed(1)} s`, st(ac/t,1.0,1.15,false)),
+           P(ac<=t ? "keeping up with demand 🏁" : `short ${fmt0((ac/t-1)*dm)} units/day`, ac<=t?"good":"bad")]}},
+{d:"🏭 Production", n:"Lead Time", f:"lead = queue + setup + run + wait",
+ i:[["Queue (h)",6],["Setup (h)",0.5],["Run (h)",7],["Wait/transport (h)",2]],
+ c:v => { const t=v.reduce((s,x)=>s+x,0); const touch=v[1]+v[2];
+   return [P(`${t.toFixed(1)} h door-to-door`, st(t,12,24,false)),
+           P(`only ${(touch/t*100).toFixed(0)}% is value-adding time`)]}},
+{d:"🏭 Production", n:"Schedule Adherence", f:"adherence = on-time orders / all orders",
+ i:[["Orders in period",120],["Finished on time",82]],
+ c:([o,ot]) => { const a=ot/o*100; return [P(a.toFixed(1)+"%", st(a,90,70)),
+   P(`${o-ot} broken promises`)]}},
+{d:"🏭 Production", n:"Changeover / Setup Time", f:"lost capacity = changeovers × minutes × $rate",
+ i:[["Changeovers/day",4],["Minutes each",45],["Machine rate ($/h)",120]],
+ c:([n,m2,r]) => { const h=n*m2/60; return [P(`${h.toFixed(1)} h/day lost`, st(h,1,2.5,false)),
+   P(`$${fmt0(h*r*330)}/yr`, "bad"), P("SMED says half of this is free 🔧")]}},
+{d:"🏭 Production", n:"Downtime — Planned vs Unplanned", f:"unplanned % = unplanned / planned production time",
+ i:[["Planned prod. time (h/day)",16],["Planned maint. (h/day)",0.7],["Unplanned down (h/day)",1.8]],
+ c:([p,pm,u]) => { const pct=u/p*100; return [P(`${pct.toFixed(1)}% unplanned`, st(pct,8,15,false)),
+   P(`planned:unplanned = ${(pm/Math.max(u,.01)).toFixed(2)} : 1 (want ≥ 1)`)]}},
+{d:"🏭 Production", n:"MTBF & MTTR → Availability", f:"inherent availability = MTBF / (MTBF + MTTR)",
+ i:[["MTBF (run-hours)",65],["MTTR (minutes)",107]],
+ c:([b,r]) => { const a=b/(b+r/60)*100; return [P(a.toFixed(2)+"% availability", st(a,97,93)),
+   P(`double MTBF → ${(b*2/(b*2+r/60)*100).toFixed(2)}% · halve MTTR → ${(b/(b+r/120)*100).toFixed(2)}%`)]}},
+
+// ─── QUALITY & COMPLIANCE ────────────────────────────────────────────────
+{d:"🧪 Quality & Compliance", n:"Right First Time", f:"RFT = (units − defects) / units",
+ i:[["Units",1000],["Defective first time",38]],
+ c:([u,d2]) => { const r=(u-d2)/u*100; return [P(r.toFixed(2)+"%", st(r,97,93))]}},
+{d:"🧪 Quality & Compliance", n:"Scrap Rate → $", f:"scrap $ = units × (material + machine time)",
+ i:[["Units",1000],["Scrapped",14],["Material $/unit",3.2],["Machine $/unit",1.8]],
+ c:([u,s,mt,mc]) => { const r=s/u*100; return [P(r.toFixed(2)+"%", st(r,1.5,4,false)),
+   P(`$${fmt0(s*(mt+mc))} in the skip`, "bad")]}},
+{d:"🧪 Quality & Compliance", n:"Rework Rate", f:"rework = reworked / units · paid twice",
+ i:[["Units",1000],["Reworked",25],["Rework cost $/unit",2.5]],
+ c:([u,rw,c2]) => { const r=rw/u*100; return [P(r.toFixed(2)+"%", st(r,1,3,false)),
+   P(`$${fmt0(rw*c2)} doing it twice`)]}},
+{d:"🧪 Quality & Compliance", n:"DPMO & Sigma Level", f:"DPMO = defects / (units × opportunities) × 10⁶",
+ i:[["Units",1000],["Opportunities/unit",5],["Defects",38]],
+ c:([u,o,d2]) => { const dp=d2/(u*o)*1e6; const s=sigmaFromDPMO(dp);
+   return [P(`${fmt0(dp)} DPMO`, st(dp,6210,66807,false)), P(`≈ ${s.toFixed(2)}σ process`)]}},
+{d:"🧪 Quality & Compliance", n:"Customer Complaints / Returns", f:"returns ppm = returned / shipped × 10⁶",
+ i:[["Units shipped",50000],["Returned",23]],
+ c:([sh,rt]) => { const ppm=rt/sh*1e6; return [P(`${fmt0(ppm)} ppm returned`, st(ppm,100,500,false)),
+   P("every return = a defect that outran inspection 🏃")]}},
+{d:"🧪 Quality & Compliance", n:"Cost of Poor Quality", f:"CoQ = scrap + rework + returns + inspection",
+ i:[["Scrap ($/mo)",8000],["Rework ($/mo)",2500],["Returns ($/mo)",1500],["Revenue ($/mo)",400000]],
+ c:([s,r,rt,rev]) => { const q=s+r+rt; const pct=q/rev*100;
+   return [P(`$${fmt0(q)}/mo`, "bad"), P(`${pct.toFixed(2)}% of revenue`, st(pct,1,3,false))]}},
+{d:"🧪 Quality & Compliance", n:"Audit Compliance Rate", f:"compliance = findings-free audits / audits",
+ i:[["Audits",24],["Passed clean",21]],
+ c:([a,p2]) => { const r=p2/a*100; return [P(r.toFixed(1)+"%", st(r,95,85))]}},
+{d:"🧪 Quality & Compliance", n:"Traceability Completeness", f:"coverage = orders with full genealogy / orders",
+ i:[["Orders",6494],["With batch genealogy",6494]],
+ c:([o,g]) => { const r=g/o*100; return [P(r.toFixed(1)+"%", st(r,99,90)),
+   P(o-g===0 ? "auditors weep with joy 📋" : `${fmt0(o-g)} orphan orders`)]}},
+
+// ─── INVENTORY & MATERIALS ───────────────────────────────────────────────
+{d:"📦 Inventory & Materials", n:"WIP Level (Little's Law)", f:"WIP = throughput × lead time",
+ i:[["Throughput (units/day)",8700],["Lead time (h)",14]],
+ c:([t,l]) => [P(`${fmt0(t*l/24)} units on the floor`, st(t*l/24/t,1,2,false)),
+   P("cut lead time in half → half the WIP, same output")]},
+{d:"📦 Inventory & Materials", n:"Stock Accuracy", f:"accuracy = correct count locations / counted",
+ i:[["Locations counted",500],["Matched the system",471]],
+ c:([c2,m2]) => { const a=m2/c2*100; return [P(a.toFixed(1)+"%", st(a,98,95)),
+   P(a<98 ? "your WMS is writing fiction 📚" : "trustworthy records")]}},
+{d:"📦 Inventory & Materials", n:"Raw Material Availability", f:"availability = 1 − starvation time / planned time",
+ i:[["Planned time (h)",160],["Waiting on material (h)",2.5]],
+ c:([p2,w2]) => { const a=(1-w2/p2)*100; return [P(a.toFixed(2)+"%", st(a,99,97)),
+   P(`${w2} h of machines drumming their fingers`)]}},
+{d:"📦 Inventory & Materials", n:"Material Yield", f:"yield = good output material / material issued",
+ i:[["Material issued (kg)",1000],["In good product (kg)",942]],
+ c:([i2,g]) => { const y=g/i2*100; return [P(y.toFixed(1)+"%", st(y,95,90)),
+   P(`${(i2-g).toFixed(0)} kg became very expensive dust`)]}},
+{d:"📦 Inventory & Materials", n:"Batch Utilization Efficiency", f:"utilization = actual batch / planned batch",
+ i:[["Planned batch size",500],["Actual produced",478]],
+ c:([p2,a]) => { const u=a/p2*100; return [P(u.toFixed(1)+"%", st(u,98,90))]}},
+
+// ─── WORKFORCE ────────────────────────────────────────────────────────────
+{d:"👷 Workforce", n:"Operator Efficiency", f:"efficiency = ideal time / actual time",
+ i:[["Ideal time (h)",6.5],["Actual time (h)",7.4]],
+ c:([i2,a]) => { const e=i2/a*100; return [P(e.toFixed(1)+"%", st(e,90,80))]}},
+{d:"👷 Workforce", n:"Labour Productivity", f:"productivity = units / labour hours",
+ i:[["Units",5200],["Labour hours",56]],
+ c:([u,h]) => [P(`${(u/h).toFixed(1)} units/labour-h`, "good")]},
+{d:"👷 Workforce", n:"Overtime Ratio", f:"overtime = OT hours / total hours",
+ i:[["Regular hours",1600],["Overtime hours",120]],
+ c:([r,ot]) => { const p2=ot/(r+ot)*100; return [P(p2.toFixed(1)+"%", st(p2,5,12,false)),
+   P(p2>12 ? "the schedule is being rescued by humans 🚒" : "sustainable")]}},
+{d:"👷 Workforce", n:"Training / Certification Compliance", f:"compliance = certified / required",
+ i:[["Operators needing certs",8],["Currently certified",6]],
+ c:([n,c2]) => { const r=c2/n*100; return [P(r.toFixed(0)+"%", st(r,90,75)),
+   P(`${n-c2} running on vibes and supervision`)]}},
+{d:"👷 Workforce", n:"Absenteeism Rate", f:"absenteeism = days lost / scheduled days",
+ i:[["Scheduled person-days",440],["Absent days",18]],
+ c:([s,a]) => { const r=a/s*100; return [P(r.toFixed(1)+"%", st(r,3,6,false))]}},
+
+// ─── MAINTENANCE ─────────────────────────────────────────────────────────
+{d:"🔧 Maintenance", n:"Maintenance Cost per Unit", f:"cost/unit = (breakdown $ + PM $) / good units",
+ i:[["Breakdown cost ($/mo)",14000],["PM cost ($/mo)",4000],["Good units/mo",260000]],
+ c:([b,p2,u]) => { const c2=(b+p2)/u; return [P(`$${c2.toFixed(3)}/unit`, st(c2,0.05,0.12,false)),
+   P(`PM share ${(p2/(b+p2)*100).toFixed(0)}% — higher is healthier`)]}},
+{d:"🔧 Maintenance", n:"Preventive Maintenance Compliance", f:"compliance = PMs done on time / PMs planned",
+ i:[["PMs planned",40],["Done on schedule",29]],
+ c:([p2,d2]) => { const r=d2/p2*100; return [P(r.toFixed(0)+"%", st(r,90,60)),
+   P(r<90 ? "skipped PMs become breakdowns with interest 📈" : "disciplined")]}},
+{d:"🔧 Maintenance", n:"Predictive Maintenance Accuracy", f:"accuracy = correct predictions / predictions",
+ i:[["Failure predictions",20],["Correct",14]],
+ c:([p2,c2]) => { const r=c2/p2*100; return [P(r.toFixed(0)+"%", st(r,80,60))]}},
+{d:"🔧 Maintenance", n:"Spare Parts Availability", f:"availability = requests filled from stock / requests",
+ i:[["Spare requests",60],["Filled immediately",51]],
+ c:([q,f2]) => { const r=f2/q*100; return [P(r.toFixed(0)+"%", st(r,95,85)),
+   P(`${q-f2} repairs waited on couriers 📦💨`)]}},
+
+// ─── ENERGY, SUSTAINABILITY & COSTING ────────────────────────────────────
+{d:"⚡ Energy, Sustainability & Costing", n:"Energy per Unit", f:"kWh/unit × tariff = $/unit",
+ i:[["kWh consumed",95000],["Good units",260000],["Tariff ($/kWh)",0.18]],
+ c:([k,u,t]) => [P(`${(k/u).toFixed(3)} kWh/unit`, st(k/u,0.5,1,false)),
+   P(`$${(k/u*t).toFixed(4)}/unit · $${fmt0(k*t)} total`)]},
+{d:"⚡ Energy, Sustainability & Costing", n:"Water per Unit", f:"water intensity = litres / good unit",
+ i:[["Litres consumed",120000],["Good units",260000]],
+ c:([w2,u]) => [P(`${(w2/u).toFixed(2)} L/unit`, st(w2/u,0.5,1.5,false))]},
+{d:"⚡ Energy, Sustainability & Costing", n:"Waste & Emissions per Unit", f:"CO₂e/unit = kWh/unit × grid factor + scrap share",
+ i:[["kWh/unit",0.37],["Grid factor (kgCO₂e/kWh)",0.4],["Scrap rate (%)",1.4]],
+ c:([k,g,s]) => [P(`${(k*g*1000).toFixed(0)} gCO₂e/unit`, st(k*g,0.2,0.4,false)),
+   P(`+ ${s}% of all embodied carbon scrapped outright`)]},
+{d:"⚡ Energy, Sustainability & Costing", n:"Production Cost per Unit", f:"cost = (machine + material + energy) / good units",
+ i:[["Machine time cost ($)",52000],["Material cost ($)",30000],["Energy cost ($)",5200],["Good units",26000]],
+ c:([m2,mt,e,u]) => [P(`$${((m2+mt+e)/u).toFixed(2)}/unit`, "warn"),
+   P(`machine ${(m2/(m2+mt+e)*100).toFixed(0)}% · material ${(mt/(m2+mt+e)*100).toFixed(0)}% · energy ${(e/(m2+mt+e)*100).toFixed(0)}%`)]},
+{d:"⚡ Energy, Sustainability & Costing", n:"Variance vs Standard Cost", f:"variance = (actual − standard) / standard",
+ i:[["Standard $/unit",2.85],["Actual $/unit",3.34]],
+ c:([s,a]) => { const v=(a-s)/s*100; return [P(`${v>=0?"+":""}${v.toFixed(1)}%`, st(v,15,30,false)),
+   P(v>0 ? "the gap IS the money bleed — ask the agents where 🤖" : "beating standard!")]}},
+{d:"⚡ Energy, Sustainability & Costing", n:"Return on Assets", f:"ROA = operating profit / total assets",
+ i:[["Operating profit ($/yr)",900000],["Production assets ($)",6500000]],
+ c:([p2,a]) => { const r=p2/a*100; return [P(r.toFixed(1)+"%", st(r,12,6)),
+   P("every OEE point recovered lifts this for free")]}},
+
+// ─── ORDER FULFILMENT & LOGISTICS ────────────────────────────────────────
+{d:"🚚 Order Fulfilment & Logistics", n:"On-Time Delivery", f:"OTD = on-time orders / orders",
+ i:[["Orders shipped",300],["On time",262]],
+ c:([o,t]) => { const r=t/o*100; return [P(r.toFixed(1)+"%", st(r,90,70))]}},
+{d:"🚚 Order Fulfilment & Logistics", n:"Order Fulfilment Cycle Time", f:"cycle = order receipt → delivery",
+ i:[["Order to production (h)",10],["Production (h)",14],["Pack & ship (h)",8]],
+ c:v => { const t=v.reduce((s,x)=>s+x,0); return [P(`${t.toFixed(0)} h (${(t/24).toFixed(1)} days)`, st(t,36,72,false))]}},
+{d:"🚚 Order Fulfilment & Logistics", n:"Customer Order Accuracy (OTIF)", f:"OTIF = on time AND in full / orders",
+ i:[["Orders",300],["On time",262],["Also complete & correct",247]],
+ c:([o,t,f2]) => { const r=f2/o*100; return [P(r.toFixed(1)+"% OTIF", st(r,85,65)),
+   P(`${t-f2} arrived punctually but wrong 📦❓`)]}},
+{d:"🚚 Order Fulfilment & Logistics", n:"SLA Compliance", f:"compliance = orders within SLA window / orders",
+ i:[["Orders under SLA",300],["Met the SLA",284]],
+ c:([o,m2]) => { const r=m2/o*100; return [P(r.toFixed(1)+"%", st(r,95,85)),
+   P(r<95 ? "penalty clauses are sharpening their pencils ✏️" : "contract-safe")]}},
+];
+
+(function renderMatrix(){
+  const root = document.getElementById("kpimatrix");
+  const domains = [...new Set(CALCS.map(c => c.d))];
+  root.innerHTML = domains.map(d => `
+    <h2 class="domain">${d}</h2>
+    <div class="calcgrid">
+      ${CALCS.map((c,idx) => c.d!==d ? "" : `
+        <div class="calc" data-idx="${idx}">
+          <h4>${c.n}</h4><div class="f">${c.f}</div>
+          ${c.i.map(([label,val],k) => `
+            <div class="ci"><label>${label}</label>
+              <input type="number" value="${val}" step="any" data-k="${k}"></div>`).join("")}
+          <div class="out"></div>
+        </div>`).join("")}
+    </div>`).join("");
+
+  function compute(card){
+    const spec = CALCS[+card.dataset.idx];
+    const vals = [...card.querySelectorAll("input")].map(i => +i.value || 0);
+    const out = spec.c(vals);
+    card.querySelector(".out").innerHTML =
+      out.map((l,ix) => ix===0 ? `<b class="${l.cls||""}">${l.v}</b>`
+                              : `<span class="${l.cls||""}">${l.v}</span>`).join("");
+  }
+  root.querySelectorAll(".calc").forEach(card => {
+    card.addEventListener("input", () => compute(card));
+    compute(card);
+  });
+})();
+</script>
+{% endblock %}

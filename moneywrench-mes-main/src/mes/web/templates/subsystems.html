@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}Subsystems — MoneyWrench MES{% endblock %}
+{% block head %}
+<style>
+.subgrid{grid-template-columns:repeat(auto-fit,minmax(460px,1fr))}
+.sub-head{display:flex;align-items:baseline;gap:12px;margin-bottom:4px}
+.sub-head .ic{font-size:26px}
+.sub-head h3{margin:0;font-size:16px}
+.sub-head .agent{margin-left:auto;font-family:var(--font-mono);font-size:10.5px;color:var(--cyan);
+  border:1px solid var(--line);border-radius:99px;padding:2px 9px;white-space:nowrap}
+.blurb{color:var(--muted);font-size:12.5px;margin:2px 0 12px}
+.deckrole{font-family:var(--font-mono);font-size:10px;color:var(--amber)}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:12px}
+.tile{background:var(--panel-2);border:1px solid var(--line);border-left:3px solid var(--line);
+  border-radius:10px;padding:10px 12px}
+.tile.good{border-left-color:var(--good)} .tile.warn{border-left-color:var(--amber)}
+.tile.bad{border-left-color:var(--bad)}
+.tile.na{border-style:dashed;opacity:.65}
+.funcs{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px}
+.func{font-family:var(--font-mono);font-size:10px;color:var(--muted);
+  border:1px solid var(--line);border-radius:99px;padding:2px 9px;
+  background:var(--panel-2)}
+.tile .k{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.09em;font-family:var(--font-mono)}
+.tile .v{font-size:19px;font-weight:700;font-family:var(--font-mono);margin-top:2px}
+.tile .v small{font-size:11px;font-weight:400;color:var(--muted)}
+.tile .n{font-size:10.5px;color:var(--muted);font-family:var(--font-mono);margin-top:2px}
+.legend{display:flex;gap:16px;margin:0 0 16px;font-family:var(--font-mono);font-size:11px;color:var(--muted)}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px}
+</style>
+{% endblock %}
+{% block content %}
+<h1 class="page">Subsystems — the KPI matrix</h1>
+<p class="sub">&gt; "Key KPIs and Subsystems Across MES" — all 7 domains, every subsystem function, all 48 KPIs from the deck. Dashed tiles need a data feed we don't have yet (never invented, only measured).</p>
+
+<div class="legend">
+  <span><span class="dot" style="background:var(--good)"></span>on target</span>
+  <span><span class="dot" style="background:var(--amber)"></span>watch</span>
+  <span><span class="dot" style="background:var(--bad)"></span>bleeding</span>
+  <span><span class="dot" style="background:var(--muted);opacity:.5"></span>not instrumented</span>
+  <span id="span-note"></span>
+</div>
+
+<div class="grid subgrid" id="subs"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(async () => {
+  const mat = await j("/kpi/subsystems");
+  if (!mat.subsystems.length){
+    document.getElementById("subs").innerHTML =
+      '<p style="font-family:var(--font-mono)">No data yet — run <code>python scripts/seed.py</code>.</p>';
+    return;
+  }
+  document.getElementById("span-note").textContent = `· window: last ${mat.days} days of history`;
+  document.getElementById("subs").innerHTML = mat.subsystems.map(s => {
+    const tiles = s.kpis.map(k => `
+      <div class="tile ${k.status}">
+        <div class="k">${k.name}</div>
+        <div class="v">${typeof k.value === "number" ? fmt2(k.value) : k.value} <small>${k.unit}</small></div>
+        <div class="n">${k.note || ""}</div>
+      </div>`).join("");
+    let table = "";
+    if (s.table.rows.length){
+      const cols = s.table.columns;
+      table = `<table><thead><tr>${cols.map(c=>`<th>${c.replaceAll("_"," ")}</th>`).join("")}</tr></thead>
+        <tbody>${s.table.rows.map(r=>`<tr>${cols.map(c=>`<td>${r[c]??"–"}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
+    }
+    const funcs = (s.functions || []).map(f => `<span class="func">${f}</span>`).join("");
+    return `<div class="card">
+      <div class="sub-head"><span class="ic">${s.icon}</span><h3>${s.name}</h3>
+        <span class="agent">🤖 ${s.agent}</span></div>
+      <div class="deckrole">deck role: ${s.deck_agent}</div>
+      <p class="blurb">${s.blurb}</p>
+      <div class="funcs">${funcs}</div>
+      <div class="tiles">${tiles}</div>
+      ${table}
+    </div>`;
+  }).join("");
+})().catch(e => {
+  document.getElementById("subs").innerHTML =
+    `<p style="color:var(--bad);font-family:var(--font-mono)">Failed: ${e.message}</p>`;
+});
+const fmt2 = n => Number(n) >= 1000 ? fmt0(n) : Number(n).toLocaleString(undefined,{maximumFractionDigits:2});
+</script>
+{% endblock %}

@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}MoneyWrench MES{% endblock %}</title>
+<script>
+/* set theme before paint to avoid flash */
+document.documentElement.dataset.theme = localStorage.getItem("mw-theme") || "dark";
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<style>
+:root[data-theme="dark"]{
+  --bg:#0d1117; --panel:#151c25; --panel-2:#10161d; --line:#27313d;
+  --ink:#e6edf3; --muted:#8d9aa8;
+  --cyan:#35cfc0; --amber:#e89a4e; --good:#5ad07f; --bad:#f0716e; --violet:#a78bfa;
+  --shadow:0 6px 24px #0006; --glow:#35cfc022;
+}
+:root[data-theme="light"]{
+  --bg:#f2f4f6; --panel:#ffffff; --panel-2:#eaedf1; --line:#d8dee5;
+  --ink:#1c2732; --muted:#5d6c7b;
+  --cyan:#0e9488; --amber:#c1691c; --good:#1e9e50; --bad:#d64545; --violet:#7c5ce0;
+  --shadow:0 4px 16px #00000014; --glow:#0e948818;
+}
+:root{--font-display:"Space Grotesk",sans-serif; --font-mono:"IBM Plex Mono",monospace}
+*{box-sizing:border-box}
+html{overflow-x:hidden}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.55 var(--font-display);
+  overflow-x:hidden}
+a{color:var(--cyan);text-decoration:none}
+
+/* ---------- shell: sidebar + content ---------- */
+.shell{display:flex;min-height:100vh}
+aside.side{width:236px;flex-shrink:0;background:var(--panel);border-right:1px solid var(--line);
+  display:flex;flex-direction:column;position:sticky;top:0;height:100vh;padding:18px 14px}
+.logo{display:flex;align-items:center;gap:10px;padding:4px 10px 16px;border-bottom:1px solid var(--line)}
+.logo .wrench{font-size:26px;display:inline-block;animation:swing 3.2s ease-in-out infinite}
+@keyframes swing{0%,100%{transform:rotate(-14deg)}50%{transform:rotate(14deg)}}
+.logo b{font-size:17px;letter-spacing:.02em;display:block;line-height:1.1}
+.logo small{color:var(--muted);font-family:var(--font-mono);font-size:10px}
+nav.side{display:flex;flex-direction:column;gap:3px;margin-top:14px;flex:1}
+nav.side a{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:10px;
+  color:var(--muted);font-weight:500;font-size:13.5px}
+nav.side a .ic{width:20px;text-align:center}
+nav.side a:hover{color:var(--ink);background:var(--panel-2)}
+nav.side a.active{color:var(--cyan);background:color-mix(in srgb,var(--cyan) 12%,transparent);
+  border:1px solid color-mix(in srgb,var(--cyan) 30%,transparent);font-weight:700}
+.side-foot{border-top:1px solid var(--line);padding:12px 10px 2px;color:var(--muted);
+  font-family:var(--font-mono);font-size:10.5px;line-height:1.6}
+
+/* ---------- content ---------- */
+.content{flex:1;min-width:0;display:flex;flex-direction:column}
+.topbar{display:flex;align-items:center;justify-content:flex-end;gap:12px;
+  padding:14px 28px 0;position:sticky;top:0;z-index:15}
+.theme-toggle{background:var(--panel);border:1px solid var(--line);color:var(--ink);
+  border-radius:99px;padding:7px 14px;cursor:pointer;font:600 12px var(--font-mono);
+  display:flex;align-items:center;gap:8px;box-shadow:var(--shadow)}
+.theme-toggle:hover{border-color:var(--cyan)}
+main{max-width:1440px;width:100%;margin:0 auto;padding:10px 28px 80px}
+h1.page{font-size:26px;margin:6px 0 2px;letter-spacing:.01em}
+p.sub{color:var(--muted);margin:0 0 22px;font-family:var(--font-mono);font-size:12.5px}
+
+/* ---------- shared components ---------- */
+.grid{display:grid;gap:16px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;
+  padding:18px 20px;box-shadow:var(--shadow)}
+.card h2{font-size:12px;margin:0 0 14px;color:var(--muted);text-transform:uppercase;
+  letter-spacing:.12em;font-family:var(--font-mono)}
+.chart-wrap{position:relative;height:280px}
+table{width:100%;border-collapse:collapse;font-size:13px;font-family:var(--font-mono)}
+th,td{text-align:left;padding:7px 9px;border-bottom:1px solid var(--line)}
+th{color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.08em}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+.cost{color:var(--bad);font-weight:600}
+.pill{display:inline-block;padding:2px 9px;border-radius:99px;font-size:11px;font-weight:700;
+  font-family:var(--font-mono)}
+.pill.bad{background:color-mix(in srgb,var(--bad) 16%,transparent);color:var(--bad)}
+.pill.good{background:color-mix(in srgb,var(--good) 14%,transparent);color:var(--good)}
+.pill.warn{background:color-mix(in srgb,var(--amber) 16%,transparent);color:var(--amber)}
+button.btn{background:var(--cyan);color:#06231f;border:0;border-radius:9px;padding:10px 20px;
+  font:700 13px var(--font-display);letter-spacing:.04em;cursor:pointer;text-transform:uppercase}
+button.btn:disabled{opacity:.5;cursor:wait}
+input.field,select.field{background:var(--panel-2);color:var(--ink);border:1px solid var(--line);
+  border-radius:9px;padding:10px 13px;font:13px var(--font-mono)}
+footer.page-foot{color:var(--muted);text-align:center;padding:18px;
+  font-family:var(--font-mono);font-size:11.5px}
+
+@media (max-width: 920px){
+  .shell{flex-direction:column}
+  aside.side{width:100%;height:auto;position:static;flex-direction:row;align-items:center;
+    flex-wrap:wrap;gap:8px;padding:10px 14px}
+  .logo{border-bottom:0;padding-bottom:4px}
+  nav.side{flex-direction:row;flex-wrap:wrap;margin-top:0}
+  .side-foot{display:none}
+}
+
+/* ---------- global print reset (leave-behind printing) ---------- */
+@media print{
+  :root[data-theme="dark"], :root[data-theme="light"]{
+    --bg:#ffffff; --panel:#ffffff; --panel-2:#f4f5f7; --line:#c9d0d8;
+    --ink:#111826; --muted:#4a5866; --cyan:#0e6e66; --amber:#8a4d12;
+    --good:#166534; --bad:#991b1b; --violet:#5b3fbf; --shadow:none; --glow:none;
+  }
+  aside.side, .topbar, footer.page-foot, #sme-fab, #sme-drawer{display:none !important}
+  main{padding:0}
+  body{background:#fff}
+}
+
+/* ---------- Manufacturing SME chat drawer ---------- */
+#sme-fab{position:fixed;right:22px;bottom:22px;z-index:60;width:54px;height:54px;
+  border-radius:50%;border:1px solid var(--line);background:var(--panel);
+  font-size:26px;cursor:pointer;box-shadow:var(--shadow)}
+#sme-fab:hover{border-color:var(--cyan)}
+#sme-drawer{position:fixed;right:0;top:0;bottom:0;width:392px;max-width:96vw;z-index:70;
+  background:var(--panel);border-left:1px solid var(--line);display:none;
+  flex-direction:column;box-shadow:-10px 0 30px #0007}
+#sme-drawer.open{display:flex}
+#sme-head{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--line)}
+#sme-head .t{flex:1}
+#sme-head b{font-size:14px;display:block}
+#sme-head small{color:var(--muted);font-family:var(--font-mono);font-size:10px}
+#sme-head button{background:none;border:1px solid var(--line);color:var(--muted);
+  border-radius:8px;padding:5px 9px;cursor:pointer;font:11px var(--font-mono)}
+#sme-head button:hover{color:var(--ink);border-color:var(--cyan)}
+#sme-msgs{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px}
+.sme-m{max-width:88%;border-radius:12px;padding:9px 12px;font-size:12.5px;line-height:1.55}
+.sme-m.user{align-self:flex-end;background:color-mix(in srgb,var(--cyan) 16%,transparent);
+  border:1px solid color-mix(in srgb,var(--cyan) 30%,transparent)}
+.sme-m.bot{align-self:flex-start;background:var(--panel-2);border:1px solid var(--line)}
+.sme-m.bot code{font-family:var(--font-mono);font-size:11px}
+.sme-m.bot a{text-decoration:underline}
+#sme-chips{display:flex;flex-wrap:wrap;gap:6px;padding:0 14px 8px}
+#sme-chips span{border:1px solid var(--line);border-radius:99px;padding:4px 10px;
+  font-size:10.5px;color:var(--muted);cursor:pointer;background:var(--panel-2)}
+#sme-chips span:hover{color:var(--cyan);border-color:var(--cyan)}
+#sme-input-row{display:flex;gap:8px;padding:12px 14px;border-top:1px solid var(--line)}
+#sme-input{flex:1;background:var(--panel-2);color:var(--ink);border:1px solid var(--line);
+  border-radius:9px;padding:9px 12px;font:12.5px var(--font-display)}
+#sme-send{background:var(--cyan);color:#06231f;border:0;border-radius:9px;padding:0 16px;
+  font:700 12px var(--font-display);cursor:pointer}
+#sme-send:disabled{opacity:.5;cursor:wait}
+</style>
+{% block head %}{% endblock %}
+</head>
+<body>
+<div class="shell">
+  <aside class="side">
+    <div class="logo"><span class="wrench">🔧</span>
+      <span><b>MoneyWrench</b><small>MES // the wrench that pays for itself</small></span>
+    </div>
+    <nav class="side">
+      <a href="/" class="{{ 'active' if page=='dashboard' else '' }}"><span class="ic">🎛️</span>Dashboard</a>
+      <a href="/subsystems" class="{{ 'active' if page=='subsystems' else '' }}"><span class="ic">🧩</span>Subsystems</a>
+      <a href="/playground" class="{{ 'active' if page=='playground' else '' }}"><span class="ic">⚙️</span>KPI Playground</a>
+      <a href="/advisor" class="{{ 'active' if page=='advisor' else '' }}"><span class="ic">🧑‍💼</span>Sales Advisor</a>
+      <a href="/agents" class="{{ 'active' if page=='agents' else '' }}"><span class="ic">🤖</span>The Agents</a>
+      <a href="/data" class="{{ 'active' if page=='data' else '' }}"><span class="ic">🗄️</span>Data Sources</a>
+      <a href="/docs" target="_blank"><span class="ic">📚</span>API Docs</a>
+    </nav>
+    <div class="side-foot">v0.2 “Righty-Tighty”<br>
+      Turning leaks into lefty-loosey money since 2026. 🔩</div>
+  </aside>
+
+  <div class="content">
+    <div class="topbar">
+      <button class="theme-toggle" id="theme-toggle" title="Toggle dark / light mode">
+        <span id="theme-ic">🌙</span><span id="theme-label">DARK</span>
+      </button>
+    </div>
+    <main>
+      {% block content %}{% endblock %}
+    </main>
+    <footer class="page-foot">MoneyWrench MES — measuring the plant so the plant can't hide.</footer>
+  </div>
+</div>
+
+<!-- Manufacturing SME chat -->
+<button id="sme-fab" title="Ask the Manufacturing SME">🧑‍🏭</button>
+<div id="sme-drawer">
+  <div id="sme-head">
+    <span style="font-size:24px">🧑‍🏭</span>
+    <div class="t"><b>Manufacturing SME</b>
+      <small>grounded in your KPIs · can search the web · pivots on evidence</small></div>
+    <button id="sme-reset" title="New conversation">↺ new</button>
+    <button id="sme-close">✕</button>
+  </div>
+  <div id="sme-msgs">
+    <div class="sme-m bot">Hello! I'm the Manufacturing SME — ask me why a process behaves
+      the way it does, how a KPI works, or what AI agents change about it. I'll pull real
+      numbers from this plant and cite the web when I go beyond it. 🔧</div>
+  </div>
+  <div id="sme-chips">
+    <span>Why does changeover hurt OEE?</span>
+    <span>What's a good FPY for discrete manufacturing?</span>
+    <span>Explain this page to me</span>
+  </div>
+  <div id="sme-input-row">
+    <input id="sme-input" placeholder="Ask the SME…">
+    <button id="sme-send">Send</button>
+  </div>
+</div>
+
+<script>
+const C = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+if (window.Chart){
+  Chart.defaults.color = C("--muted");
+  Chart.defaults.borderColor = C("--line");
+  Chart.defaults.font.family = '"IBM Plex Mono", monospace';
+}
+const PALETTE = [C("--cyan"),C("--amber"),C("--good"),C("--bad"),C("--violet"),"#f27bb0","#8fa4c0"];
+const fmt0 = n => n == null ? "–" : Number(n).toLocaleString(undefined,{maximumFractionDigits:0});
+const pct1 = n => n == null ? "–" : (n*100).toFixed(1) + "%";
+async function j(url){const r = await fetch(url); if(!r.ok) throw new Error(await r.text()); return r.json();}
+
+/* theme toggle: swap attribute + reload so charts pick up new colors */
+(function(){
+  const btn = document.getElementById("theme-toggle");
+  const cur = document.documentElement.dataset.theme;
+  document.getElementById("theme-ic").textContent = cur === "dark" ? "🌙" : "☀️";
+  document.getElementById("theme-label").textContent = cur.toUpperCase();
+  btn.addEventListener("click", () => {
+    const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+    localStorage.setItem("mw-theme", next);
+    location.reload();
+  });
+})();
+
+/* ---------- Manufacturing SME chat drawer ---------- */
+(function(){
+  const drawer = document.getElementById("sme-drawer");
+  const msgs = document.getElementById("sme-msgs");
+  const input = document.getElementById("sme-input");
+  const send = document.getElementById("sme-send");
+  const page = "{{ page }}" || location.pathname;
+  let sid = sessionStorage.getItem("sme-sid");
+  if (!sid){ sid = crypto.randomUUID(); sessionStorage.setItem("sme-sid", sid); }
+
+  const esc = s => s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  const md = s => esc(s)
+    .replace(/\*\*(.+?)\*\*/g,"<b>$1</b>")
+    .replace(/`([^`]+)`/g,"<code>$1</code>")
+    .replace(/\[([^\]]+)\]\((https?:[^)]+)\)/g,'<a href="$2" target="_blank">$1</a>')
+    .replace(/^### (.+)$/gm,"<b>$1</b>")
+    .replace(/^[-•] /gm,"• ")
+    .replace(/\n/g,"<br>");
+  const add = (cls, html) => {
+    const d = document.createElement("div");
+    d.className = "sme-m " + cls; d.innerHTML = html;
+    msgs.appendChild(d); msgs.scrollTop = msgs.scrollHeight; return d;
+  };
+
+  document.getElementById("sme-fab").addEventListener("click", () => drawer.classList.toggle("open"));
+  document.getElementById("sme-close").addEventListener("click", () => drawer.classList.remove("open"));
+  document.getElementById("sme-reset").addEventListener("click", async () => {
+    try{ await fetch("/sme/chat/"+sid, {method:"DELETE"}); }catch(e){}
+    sid = crypto.randomUUID(); sessionStorage.setItem("sme-sid", sid);
+    msgs.innerHTML = ""; add("bot", "Fresh start — what shall we dig into? 🔧");
+  });
+  document.querySelectorAll("#sme-chips span").forEach(ch =>
+    ch.addEventListener("click", () => { input.value = ch.textContent; ask(); }));
+
+  async function ask(){
+    const q = input.value.trim();
+    if (!q || send.disabled) return;
+    input.value = ""; send.disabled = true;
+    add("user", esc(q));
+    const bot = add("bot", "<i>thinking…</i>");
+    let text = "";
+    try{
+      const r = await fetch("/sme/chat", {method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({session_id:sid, message:q, page})});
+      if (!r.ok || !r.body) throw new Error("HTTP " + r.status);
+      const reader = r.body.getReader(); const dec = new TextDecoder();
+      let buf = "";
+      while (true){
+        const {done, value} = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, {stream:true});
+        const lines = buf.split("\n\n"); buf = lines.pop();
+        for (const line of lines){
+          if (!line.startsWith("data: ")) continue;
+          const d = JSON.parse(line.slice(6));
+          if (d.text){ text += (text ? "\n\n" : "") + d.text; bot.innerHTML = md(text); }
+          if (d.error){ bot.innerHTML = md("⚠️ " + d.error +
+            "\n\n(Is Claude auth configured on the server?)"); }
+          msgs.scrollTop = msgs.scrollHeight;
+        }
+      }
+      if (!text && bot.innerHTML.includes("thinking")) bot.innerHTML = "<i>(no reply)</i>";
+    }catch(e){ bot.innerHTML = md("⚠️ " + e.message); }
+    send.disabled = false; input.focus();
+  }
+  send.addEventListener("click", ask);
+  input.addEventListener("keydown", e => { if (e.key === "Enter") ask(); });
+})();
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

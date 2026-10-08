@@ -1,0 +1,33 @@
+# MoneyWrench MES — agent crew configuration
+# ─────────────────────────────────────────────────────────────────────
+# The models are fully swappable: change a value below and restart the
+# server (or re-run scripts/ask.py). No code changes needed.
+#
+#   model values:  sonnet | opus | haiku | inherit
+#                  ("inherit" uses whatever model the Claude runtime
+#                   defaults to — handy when you upgrade globally)
+#   enabled:       set false to bench an agent without deleting it
+#
+# The orchestrator plans and delegates; each specialist owns one MES
+# subsystem (mapping to the deck: Planner / Diagnosis / Material /
+# Energy agents + coordinator).
+
+default_model: sonnet
+
+orchestrator:
+  model: inherit
+  max_turns: 40
+
+agents:
+  kpi-analyst:            { model: sonnet, enabled: true }   # OEE trends + workforce
+  downtime-investigator:  { model: sonnet, enabled: true }   # deck: Diagnosis Agent
+  cost-leakage-hunter:    { model: sonnet, enabled: true }   # money bleed ranking
+  schedule-auditor:       { model: sonnet, enabled: true }   # deck: Planner Agent
+  maintenance-strategist: { model: sonnet, enabled: true }   # MTBF / MTTR
+  quality-warden:         { model: sonnet, enabled: true }   # FPY / scrap / COPQ
+  material-controller:    { model: sonnet, enabled: true }   # deck: Material Agent
+  energy-optimizer:       { model: sonnet, enabled: true }   # deck: Energy Agent
+  sales-engineer:         { model: sonnet, enabled: true }   # advisor pitch writer
+  # chat co-pilot for sales execs; strictness: high = numbers only from
+  # tools or cited web sources ("deterministic but can pivot")
+  manufacturing-sme:      { model: sonnet, enabled: true, strictness: high }
